@@ -1,38 +1,54 @@
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:uuid/uuid.dart';
 
 void main() {
-  runApp(const SNoteMain());
+  runApp(const SNoteApp());
 }
 
-class SNoteMain extends StatefulWidget {
+class SNoteApp extends StatelessWidget {
+  const SNoteApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (context) => SNoteAppState(),
+      child: const SNoteMain(),
+    );
+  }
+}
+
+class SNoteMain extends StatelessWidget {
   const SNoteMain({super.key});
 
   @override
-  State createState() => _SNoteMainState();
-}
-
-class _SNoteMainState extends State<SNoteMain> {
-  @override
   Widget build(BuildContext context) {
+    var appState = Provider.of<SNoteAppState>(context, listen: false);
     return MaterialApp(
       theme: ThemeData(
           useMaterial3: false,
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.white)),
-      home: Scaffold(
-        body: const NoteCardContainer(),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {},
-          tooltip: 'Create',
-          child: const Icon(Icons.add),
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: const NoteCards(),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              var note = appState.createNote();
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => NoteEditor(note: note)));
+            },
+            tooltip: 'Create',
+            child: const Icon(Icons.add),
+          ),
+          floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
+          bottomNavigationBar: const _BottomAppBar(),
         ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
-        bottomNavigationBar: const _BottomAppBar(),
       ),
     );
   }
@@ -58,18 +74,6 @@ class _BottomAppBar extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class NoteCardContainer extends StatelessWidget {
-  const NoteCardContainer({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => SNoteAppState(),
-      child: const NoteCards(),
     );
   }
 }
@@ -110,17 +114,6 @@ class NoteCards extends StatelessWidget {
               ),
             ),
             onTap: () => {
-              // Navigator.of(context).push(MaterialPageRoute(
-              //     builder: (context) => NoteEditor(id: note.id)))
-              // Navigator
-              // .push(
-              //     context,
-              //     MaterialPageRoute(
-              //         builder: (context) => Provider(
-              //               create: (context) => MyAppState(),
-              //               builder: (context, child) =>
-              //                   NoteEditor(id: note.id),
-              //             )))
               Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -208,7 +201,7 @@ class SNoteAppState extends ChangeNotifier {
     jsonData.then((value) {
       List<String> jsonList =
           (jsonDecode(value) as List<dynamic>).cast<String>();
-      noteList = jsonList.map((e) => NoteModel(content: e)).toList();
+      noteList = jsonList.map((e) => NoteModel.autoId(content: e)).toList();
       notifyListeners();
     });
   }
@@ -226,17 +219,31 @@ class SNoteAppState extends ChangeNotifier {
     noteList.firstWhere((element) => element.id == id).content = content;
     notifyListeners();
   }
+
+  NoteModel createNote() {
+    var note = NoteModel.autoId(content: '');
+    noteList.insert(0, note);
+
+    return note;
+  }
 }
 
 class NoteModel {
   late String id;
   late List<dynamic> content;
-  NoteModel({required String content}) {
-    var bytes = utf8.encode(content);
-    id = sha1.convert(bytes).toString();
-    var deltaNote = quill.Delta();
+  static const uuid = Uuid();
+  NoteModel.autoId({required String content}) {
+    id = uuid.v1();
+    this.content = convertContent(content);
+  }
 
+  NoteModel({required this.id, required String content}) {
+    this.content = convertContent(content);
+  }
+
+  List<dynamic> convertContent(String content) {
+    var deltaNote = quill.Delta();
     deltaNote.insert('$content\n');
-    this.content = deltaNote.toJson();
+    return deltaNote.toJson();
   }
 }
