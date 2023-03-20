@@ -5,8 +5,13 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:uuid/uuid.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide EmailAuthProvider;
+import 'package:firebase_ui_auth/firebase_ui_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+Future<void> main() async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const SNoteApp());
 }
 
@@ -15,9 +20,34 @@ class SNoteApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => SNoteAppState(),
-      child: const SNoteMain(),
+    var authProviders = [EmailAuthProvider()];
+    var appState = SNoteAppState();
+    // FirebaseAuth.instance.authStateChanges().listen(
+    //   (User? user) {
+    //     user?.getIdToken().then((value) {});
+    //   },
+    // );
+    return MaterialApp(
+      initialRoute:
+          FirebaseAuth.instance.currentUser == null ? '/sign-in' : '/index',
+      routes: {
+        '/sign-in': (context) {
+          return SignInScreen(
+            providers: authProviders,
+            actions: [
+              AuthStateChangeAction<SignedIn>((context, state) {
+                Navigator.pushReplacementNamed(context, '/index');
+              })
+            ],
+          );
+        },
+        '/index': (context) {
+          return ChangeNotifierProvider(
+            create: (context) => appState,
+            child: const SNoteMain(),
+          );
+        }
+      },
     );
   }
 }
@@ -28,6 +58,7 @@ class SNoteMain extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = Provider.of<SNoteAppState>(context, listen: false);
+
     return MaterialApp(
       theme: ThemeData(
           useMaterial3: false,

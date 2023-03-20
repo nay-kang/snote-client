@@ -26,3 +26,8 @@ but for now.I must make the app run first.above is ideal model
 
 2023-03-14
 maybe web3 or IPFS will make this project more interest. I should make a connector or adaptor to web3 or IPFS.
+
+2023-03-17
+using git like distribution storage is a bit chanllenge for current stage. so I decide using client encrypt first.
+after first regist, client generate an aes key to encrypt the note. server only store encrypted data.
+if other client login, server tried to tell each other using LAN to exchange aes key. but current I stuck at web client which can't obtain local ip address.
