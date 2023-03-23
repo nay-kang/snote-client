@@ -46,6 +46,8 @@ dependencies:
   firebase_auth: ^4.2.2
   firebase_ui_auth: ^1.1.17
   firebase_core: ^2.8.0
+  http: ^0.13.5
+  flutter_secure_storage: ^8.0.0
 
 
 dev_dependencies:
