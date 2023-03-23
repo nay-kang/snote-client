@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from core.serializers import NoteSerializer
 
 class NoteView(APIView):
+    # permission_classes = []
     
     def get(self,request,format=None):
         uid = request.uid

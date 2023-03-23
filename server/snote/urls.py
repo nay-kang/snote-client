@@ -16,9 +16,10 @@ Including another URLconf
 # from django.contrib import admin
 from django.urls import path
 from core.views import NoteView
+from django.http.response import HttpResponse
 
 urlpatterns = [
-    # path('admin/', admin.site.urls),
+    path('', lambda x:HttpResponse('hello world')),
     path('note/',NoteView.as_view()),
     path('note/<str:pk>',NoteView.as_view())
 ]

@@ -8,6 +8,9 @@ class AuthMiddleware:
         self.get_response = get_response
         
     def __call__(self, request) -> any:
+        if request.path=='/':
+            return self.get_response(request)
+        
         token:str = request.META['HTTP_AUTHORIZATION']
         token = token.replace('Bearer','').strip()
         try:
