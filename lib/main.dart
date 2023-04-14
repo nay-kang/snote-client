@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -235,13 +236,21 @@ class SNoteAppState extends ChangeNotifier {
     FirebaseAuth.instance.authStateChanges().listen(
       (User? user) {
         () async {
-          token = await user?.getIdToken();
+          if (user == null) {
+            return;
+          }
+          token = await user.getIdToken();
           if (token == null) {
             return;
           }
           //TODO need a solution to generate a aes key for new user
           var seStorage = const FlutterSecureStorage();
           var aesKeyBase64 = await seStorage.read(key: 'note_aes_key');
+          if (aesKeyBase64 == null) {
+            var secureRandom = encrypt.SecureRandom(32);
+            aesKeyBase64 = secureRandom.base64;
+            await seStorage.write(key: 'note_aes_key', value: aesKeyBase64);
+          }
           noteService = NoteService(token!, aesKeyBase64!);
           var notes = await noteService.loadNotesHttp();
           noteList.addAll(notes);
@@ -278,10 +287,23 @@ class NoteService {
   late encrypt.Encrypter _encrypter;
   late String token;
   late String aesKeyBase64;
-  static const String host = 'http://127.0.0.1:8000';
+  String? host;
   NoteService(this.token, this.aesKeyBase64) {
     var aesKey = encrypt.Key.fromBase64(aesKeyBase64);
     _encrypter = encrypt.Encrypter(encrypt.AES(aesKey));
+  }
+
+  Future<String> getHost() async {
+    if (host == null) {
+      var env = const bool.fromEnvironment('dart.vm.product') ? 'prod' : 'dev';
+      var configJson = await rootBundle.loadString('assets/config.$env.json');
+      print(configJson);
+      var config = jsonDecode(configJson);
+      print(config);
+      host = config['api_host'];
+      print("host:$host");
+    }
+    return host!;
   }
 
   Future<NoteModel> updateNote(String id, List<dynamic> content) async {
@@ -290,6 +312,7 @@ class NoteService {
       HttpHeaders.authorizationHeader: 'Bearer $token',
       'Content-Type': 'application/json; charset=UTF-8',
     };
+    var host = await getHost();
     var response = await http.put(Uri.parse('$host/note/$id'),
         headers: header,
         body: jsonEncode({
@@ -309,6 +332,7 @@ class NoteService {
     var header = {
       HttpHeaders.authorizationHeader: 'Bearer $token',
     };
+    var host = await getHost();
     var response = await http.get(Uri.parse('$host/note/'), headers: header);
     List data = jsonDecode(response.body);
     var notes = data.map((d) {
