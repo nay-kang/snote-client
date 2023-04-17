@@ -12,7 +12,7 @@ import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:http/http.dart' as http;
-import 'package:encrypt/encrypt.dart' as encrypt;
+import 'package:webcrypto/webcrypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 Future<void> main() async {
@@ -247,11 +247,13 @@ class SNoteAppState extends ChangeNotifier {
           var seStorage = const FlutterSecureStorage();
           var aesKeyBase64 = await seStorage.read(key: 'note_aes_key');
           if (aesKeyBase64 == null) {
-            var secureRandom = encrypt.SecureRandom(32);
-            aesKeyBase64 = secureRandom.base64;
+            var aesKey = Uint8List(32);
+            fillRandomBytes(aesKey);
+            aesKeyBase64 = base64.encode(aesKey);
             await seStorage.write(key: 'note_aes_key', value: aesKeyBase64);
           }
-          noteService = NoteService(token!, aesKeyBase64!);
+          var aesKey = base64.decode(aesKeyBase64);
+          noteService = NoteService(token!, aesKey);
           var notes = await noteService.loadNotesHttp();
           noteList.addAll(notes);
           notifyListeners();
@@ -284,30 +286,29 @@ class SNoteAppState extends ChangeNotifier {
 }
 
 class NoteService {
-  late encrypt.Encrypter _encrypter;
+  AesGcmSecretKey? _encryptor;
   late String token;
-  late String aesKeyBase64;
+  late Uint8List aesKey;
   String? host;
-  NoteService(this.token, this.aesKeyBase64) {
-    var aesKey = encrypt.Key.fromBase64(aesKeyBase64);
-    _encrypter = encrypt.Encrypter(encrypt.AES(aesKey));
+  NoteService(this.token, this.aesKey);
+
+  Future<AesGcmSecretKey> getEncryptor() async {
+    _encryptor ??= await AesGcmSecretKey.importRawKey(aesKey);
+    return _encryptor!;
   }
 
   Future<String> getHost() async {
     if (host == null) {
       var env = const bool.fromEnvironment('dart.vm.product') ? 'prod' : 'dev';
       var configJson = await rootBundle.loadString('assets/config.$env.json');
-      print(configJson);
       var config = jsonDecode(configJson);
-      print(config);
       host = config['api_host'];
-      print("host:$host");
     }
     return host!;
   }
 
   Future<NoteModel> updateNote(String id, List<dynamic> content) async {
-    var encContentStr = _encrypt(jsonEncode(content));
+    String encContentStr = await _encrypt(jsonEncode(content));
     var header = {
       HttpHeaders.authorizationHeader: 'Bearer $token',
       'Content-Type': 'application/json; charset=UTF-8',
@@ -319,7 +320,7 @@ class NoteService {
           'content': encContentStr,
         }));
     Map<String, dynamic> data = jsonDecode(response.body);
-    var decContent = _decrypt(data['content']);
+    var decContent = await _decrypt(data['content']);
     var note = NoteModel(
         id: data['id'],
         content: jsonDecode(decContent),
@@ -335,10 +336,10 @@ class NoteService {
     var host = await getHost();
     var response = await http.get(Uri.parse('$host/note/'), headers: header);
     List data = jsonDecode(response.body);
-    var notes = data.map((d) {
+    var notesFutures = data.map((d) async {
       var n = (d as Map<String, dynamic>);
       var ciphertext = n['content'];
-      var plaintext = _decrypt(ciphertext);
+      var plaintext = await _decrypt(ciphertext);
       var note = NoteModel(
           id: n['id'],
           content: jsonDecode(plaintext),
@@ -346,20 +347,29 @@ class NoteService {
           updatedAt: n['updated_at']);
       return note;
     }).toList();
+    var notes = await Future.wait(notesFutures);
     return notes;
   }
 
-  String _encrypt(String content) {
-    var iv = encrypt.IV.fromSecureRandom(16);
-    var encContent = _encrypter.encrypt(content, iv: iv);
-    return iv.base64 + encContent.base64;
+  Future<String> _encrypt(String content) async {
+    var ivBytes = Uint8List(16);
+    fillRandomBytes(ivBytes);
+    var encryptor = await getEncryptor();
+    var data = Uint8List.fromList(content.codeUnits);
+    var encryptedBytes = await encryptor.encryptBytes(data, ivBytes);
+    var iv = base64.encode(ivBytes);
+    return iv + base64.encode(encryptedBytes);
   }
 
-  String _decrypt(String ciphertext) {
-    var ivStr = ciphertext.substring(0, 24);
-    var iv = encrypt.IV.fromBase64(ivStr);
-    var encContentStr = ciphertext.substring(24);
-    return _encrypter.decrypt64(encContentStr, iv: iv);
+  Future<String> _decrypt(String content) async {
+    var iv = content.substring(0, 24);
+    var ivBytes = base64.decode(iv);
+    var encryptor = await getEncryptor();
+    var encryptedText = content.substring(24);
+    var data = base64.decode(encryptedText);
+    var decryptedBytes = await encryptor.decryptBytes(data, ivBytes);
+    var noteText = String.fromCharCodes(decryptedBytes);
+    return noteText;
   }
 }
 
