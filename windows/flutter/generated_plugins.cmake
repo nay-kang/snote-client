@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   desktop_webview_auth
   flutter_secure_storage_windows
   pasteboard
+  smart_auth
   url_launcher_windows
 )
 

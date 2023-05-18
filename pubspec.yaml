@@ -47,6 +47,10 @@ dependencies:
   http: ^0.13.5
   flutter_secure_storage: ^8.0.0
   webcrypto: ^0.5.2
+  web_socket_channel: ^2.4.0
+  json_rpc_2: ^3.0.2
+  pinput: ^2.2.31
+  google_fonts: ^4.0.4
 
 
 dev_dependencies:

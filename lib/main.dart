@@ -10,12 +10,18 @@ import 'package:uuid/uuid.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide EmailAuthProvider;
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 import 'firebase_options.dart';
 import 'package:http/http.dart' as http;
 import 'package:webcrypto/webcrypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:json_rpc_2/json_rpc_2.dart' as jrpc;
+import 'package:pinput/pinput.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'dart:math';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const SNoteApp());
 }
@@ -56,10 +62,45 @@ class SNoteApp extends StatelessWidget {
 class SNoteMain extends StatelessWidget {
   const SNoteMain({super.key});
 
+  // static Route<void> _keyExchangePopup(
+  //     BuildContext context, Object? arguments) {
+  //   return MaterialPageRoute<void>(
+  //     builder: (BuildContext context) => KeyExchangePop(),
+  //     fullscreenDialog: true,
+  //   );
+  // }
+
   @override
   Widget build(BuildContext context) {
     var appState = Provider.of<SNoteAppState>(context, listen: false);
 
+    appState.listenForAesKeyRequire(() {
+      // Navigator.restorablePush(context, _keyExchangePopup);
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
+                    value: appState,
+                    child: KeyExchangePop(),
+                  )));
+    });
+    appState.listenForAesKeyCodeGenerate(() {
+      // Navigator.restorablePush(context, _keyExchangeCodePopup);
+      // print(context);
+      // Navigator.push(
+      //     context,
+      //     MaterialPageRoute(
+      //         builder: (BuildContext contenxt) => KeyExchangeCodePop(),
+      //         fullscreenDialog: true));
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
+                    value: appState,
+                    child: const KeyExchangeCodePop(),
+                  )));
+    });
+    appState.checkAesKey();
     return MaterialApp(
       theme: ThemeData(
           useMaterial3: false,
@@ -227,12 +268,185 @@ class NoteEditor extends StatelessWidget {
   }
 }
 
+class KeyExchangePop extends StatelessWidget {
+  const KeyExchangePop({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    var appState = Provider.of<SNoteAppState>(context);
+    appState.listenForAesKeyExchangeDone(() {
+      appState.checkAesKey();
+      Navigator.pop(context);
+    });
+    final textController = TextEditingController();
+    final defaultPinTheme = PinTheme(
+      width: 56,
+      height: 56,
+      textStyle: GoogleFonts.poppins(
+        fontSize: 22,
+        color: const Color.fromRGBO(30, 60, 87, 1),
+      ),
+      decoration: const BoxDecoration(),
+    );
+    final preFilledWidget = Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Container(
+          width: 56,
+          height: 3,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ],
+    );
+
+    return Scaffold(
+        body: Column(children: [
+      Text('Enter Code'),
+      Pinput(
+        length: 4,
+        pinAnimationType: PinAnimationType.slide,
+        controller: textController,
+        defaultPinTheme: defaultPinTheme,
+        showCursor: true,
+        preFilledWidget: preFilledWidget,
+        onCompleted: (value) {
+          appState.verifyAesExchangeCode(value);
+        },
+      ),
+      const SizedBox(
+        height: 44,
+      ),
+      Text('please make one of your other client online to generate code')
+    ]));
+  }
+}
+
+class KeyExchangeCodePop extends StatelessWidget {
+  const KeyExchangeCodePop({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    var appState = Provider.of<SNoteAppState>(context, listen: false);
+    appState.listenForAesKeyExchangeDone(() {
+      Navigator.pop(context);
+    });
+    var random = Random();
+    var code = String.fromCharCodes(
+      List.generate(4, (index) => random.nextInt(10) + 48),
+    );
+    appState.setAesExchangeCode(code);
+
+    return Scaffold(
+        body: Column(children: [
+      Text('Key Exchange Code'),
+      Text(code),
+      const SizedBox(
+        height: 44,
+      ),
+      Text(
+          'your other client are requiring the important encryption key,enter this code to that client means let this device give key to that client')
+    ]));
+  }
+}
+
 class SNoteAppState extends ChangeNotifier {
   List<NoteModel> noteList = [];
   String? token;
   late NoteService noteService;
 
-  SNoteAppState() {
+  listenForAesKeyRequire(Function aesKeyRequireCallback) {
+    _aesKeyRequireCallback = aesKeyRequireCallback;
+  }
+
+  listenForAesKeyCodeGenerate(Function aesKeyCodeCallback) {
+    _aesKeyCodeCallback = aesKeyCodeCallback;
+  }
+
+  listenForAesKeyExchangeDone(Function callback) {
+    _aesKeyExchangeDoneCallback = callback;
+  }
+
+  Function? _aesKeyCodeCallback;
+  Function? _aesKeyRequireCallback;
+  Function? _aesKeyExchangeDoneCallback;
+
+  Map<String, dynamic>? _pubTempKey;
+  Map<String, dynamic>? _privateTempKey;
+  Uint8List? _tempEncryptKey;
+  _aesKeyCodeVerifyCallback(String code, String from) async {
+    if (code != this.code) {
+      print('code not match');
+      return;
+    }
+    var keyPair = await EcdhPrivateKey.generateKey(EllipticCurve.p256);
+    _pubTempKey = await keyPair.publicKey.exportJsonWebKey();
+    _privateTempKey = await keyPair.privateKey.exportJsonWebKey();
+    var data = {"type": "publicKeyFromA", "key": _pubTempKey};
+    noteService.sendToClient(from, json.encode(data));
+  }
+
+  _messageFromClient(String from, String message) async {
+    var inData = json.decode(message);
+    switch (inData['type']) {
+      case 'publicKeyFromA':
+        var keyPair = await EcdhPrivateKey.generateKey(EllipticCurve.p256);
+        _pubTempKey = await keyPair.publicKey.exportJsonWebKey();
+        _privateTempKey = await keyPair.privateKey.exportJsonWebKey();
+        var outData = {"type": "publicKeyFromB", "key": _pubTempKey};
+        noteService.sendToClient(from, json.encode(outData));
+        var publicKey = await EcdhPublicKey.importJsonWebKey(
+            inData['key'] as Map<String, dynamic>, EllipticCurve.p256);
+        var privateKey = await EcdhPrivateKey.importJsonWebKey(
+            _privateTempKey!, EllipticCurve.p256);
+        _tempEncryptKey = await privateKey.deriveBits(256, publicKey);
+        break;
+
+      case 'publicKeyFromB':
+        var publicKey0 = await EcdhPublicKey.importJsonWebKey(
+            inData['key'] as Map<String, dynamic>, EllipticCurve.p256);
+        var privateKey0 = await EcdhPrivateKey.importJsonWebKey(
+            _privateTempKey!, EllipticCurve.p256);
+        _tempEncryptKey = await privateKey0.deriveBits(256, publicKey0);
+
+        var tempAesKey = await AesGcmSecretKey.importRawKey(_tempEncryptKey!);
+
+        var ivBytes = Uint8List(16);
+        fillRandomBytes(ivBytes);
+        var encryptedBytes =
+            await tempAesKey.encryptBytes(mainAesKey!, ivBytes);
+        var iv = base64.encode(ivBytes);
+        var outData = {
+          "type": "mainAesKeyFromA",
+          "key": iv + base64.encode(encryptedBytes)
+        };
+        noteService.sendToClient(from, json.encode(outData));
+        _aesKeyExchangeDoneCallback!();
+        break;
+
+      case 'mainAesKeyFromA':
+        var keyStr = inData['key'];
+        var iv = keyStr.substring(0, 24);
+        var ivBytes = base64.decode(iv);
+        var encryptedText = keyStr.substring(24);
+        var encryptedMainKey = base64.decode(encryptedText);
+        var tempAesKey = await AesGcmSecretKey.importRawKey(_tempEncryptKey!);
+        var decryptedBytes =
+            await tempAesKey.decryptBytes(encryptedMainKey, ivBytes);
+        var aesKeyBase64 = base64.encode(decryptedBytes);
+        await seStorage.write(key: 'note_aes_key', value: aesKeyBase64);
+        _aesKeyExchangeDoneCallback!();
+        break;
+      default:
+        print("unkown message type from client ${inData['type']}");
+    }
+  }
+
+  Uint8List? mainAesKey;
+  late FlutterSecureStorage seStorage;
+  checkAesKey() async {
     FirebaseAuth.instance.authStateChanges().listen(
       (User? user) {
         () async {
@@ -243,20 +457,37 @@ class SNoteAppState extends ChangeNotifier {
           if (token == null) {
             return;
           }
-          //TODO need a solution to generate a aes key for new user
-          var seStorage = const FlutterSecureStorage();
+
+          seStorage = const FlutterSecureStorage();
+
+          noteService = NoteService(token!, _aesKeyCodeCallback!,
+              _aesKeyCodeVerifyCallback, _messageFromClient);
+          var clientId = await seStorage.read(key: 'client_id');
+          if (clientId == null) {
+            var uuid = const Uuid();
+            clientId = uuid.v4().toString();
+            await seStorage.write(key: 'client_id', value: clientId);
+          }
+          var clientCount = await noteService.registClient(clientId);
+
           var aesKeyBase64 = await seStorage.read(key: 'note_aes_key');
-          if (aesKeyBase64 == null) {
+          if (aesKeyBase64 == null && clientCount <= 1) {
             var aesKey = Uint8List(32);
             fillRandomBytes(aesKey);
             aesKeyBase64 = base64.encode(aesKey);
             await seStorage.write(key: 'note_aes_key', value: aesKeyBase64);
           }
-          var aesKey = base64.decode(aesKeyBase64);
-          noteService = NoteService(token!, aesKey);
-          var notes = await noteService.loadNotesHttp();
-          noteList.addAll(notes);
-          notifyListeners();
+          if (aesKeyBase64 == null) {
+            _aesKeyRequireCallback!();
+            noteService.prepareKeyExchange();
+          } else {
+            mainAesKey = base64.decode(aesKeyBase64);
+            noteService.setAesKey(mainAesKey!);
+            await noteService.getRpcClient();
+            var notes = await noteService.loadNotesHttp();
+            noteList.addAll(notes);
+            notifyListeners();
+          }
         }();
       },
     );
@@ -283,18 +514,35 @@ class SNoteAppState extends ChangeNotifier {
 
     return note;
   }
+
+  late String code;
+  setAesExchangeCode(String code) {
+    this.code = code;
+  }
+
+  void verifyAesExchangeCode(String code) {
+    noteService.verifyAesExchangeCode(code);
+  }
 }
 
 class NoteService {
   AesGcmSecretKey? _encryptor;
   late String token;
-  late Uint8List aesKey;
+  Uint8List? aesKey;
   String? host;
-  NoteService(this.token, this.aesKey);
+  Function aesKeyCodeCallback;
+  Function aesKeyCodeVerifyCallback;
+  Function messageFromClient;
+  NoteService(this.token, this.aesKeyCodeCallback,
+      this.aesKeyCodeVerifyCallback, this.messageFromClient);
 
   Future<AesGcmSecretKey> getEncryptor() async {
-    _encryptor ??= await AesGcmSecretKey.importRawKey(aesKey);
+    _encryptor ??= await AesGcmSecretKey.importRawKey(aesKey!);
     return _encryptor!;
+  }
+
+  void setAesKey(Uint8List aesKey) {
+    this.aesKey = aesKey;
   }
 
   Future<String> getHost() async {
@@ -309,16 +557,14 @@ class NoteService {
 
   Future<NoteModel> updateNote(String id, List<dynamic> content) async {
     String encContentStr = await _encrypt(jsonEncode(content));
-    var header = {
-      HttpHeaders.authorizationHeader: 'Bearer $token',
-      'Content-Type': 'application/json; charset=UTF-8',
-    };
+    var header = getHeaders();
     var host = await getHost();
     var response = await http.put(Uri.parse('$host/note/$id'),
         headers: header,
         body: jsonEncode({
           'content': encContentStr,
         }));
+
     Map<String, dynamic> data = jsonDecode(response.body);
     var decContent = await _decrypt(data['content']);
     var note = NoteModel(
@@ -329,10 +575,29 @@ class NoteService {
     return note;
   }
 
+  Map<String, String> getHeaders() {
+    return {
+      HttpHeaders.authorizationHeader: 'Bearer $token',
+      'Content-Type': 'application/json; charset=UTF-8',
+    };
+  }
+
+  Future<int> registClient(clientId) async {
+    var host = await getHost();
+    var headers = getHeaders();
+    var response = await http.put(
+      Uri.parse('$host/client/$clientId'),
+      headers: headers,
+    );
+    Map<String, dynamic> data = jsonDecode(response.body);
+    return data['client_count'];
+  }
+
   Future<List<NoteModel>> loadNotesHttp() async {
     var header = {
       HttpHeaders.authorizationHeader: 'Bearer $token',
     };
+
     var host = await getHost();
     var response = await http.get(Uri.parse('$host/note/'), headers: header);
     List data = jsonDecode(response.body);
@@ -355,7 +620,7 @@ class NoteService {
     var ivBytes = Uint8List(16);
     fillRandomBytes(ivBytes);
     var encryptor = await getEncryptor();
-    var data = Uint8List.fromList(content.codeUnits);
+    var data = utf8.encode(content);
     var encryptedBytes = await encryptor.encryptBytes(data, ivBytes);
     var iv = base64.encode(ivBytes);
     return iv + base64.encode(encryptedBytes);
@@ -368,8 +633,53 @@ class NoteService {
     var encryptedText = content.substring(24);
     var data = base64.decode(encryptedText);
     var decryptedBytes = await encryptor.decryptBytes(data, ivBytes);
-    var noteText = String.fromCharCodes(decryptedBytes);
+    var noteText = utf8.decode(decryptedBytes);
     return noteText;
+  }
+
+  jrpc.Peer? rpcClient;
+  Future<jrpc.Client> getRpcClient() async {
+    if (rpcClient == null) {
+      var host = await getHost();
+      host = host.replaceAll('http', 'ws');
+      var uri = Uri.parse("$host/ws/");
+      var channel = WebSocketChannel.connect(uri);
+      rpcClient = jrpc.Peer(channel.cast<String>());
+
+      unawaited(rpcClient!.listen());
+      var _ = await rpcClient!.sendRequest('auth', {'token': token});
+
+      rpcClient!.registerMethod('aeskeyCodeGenerate', (jrpc.Parameters params) {
+        aesKeyCodeCallback();
+      });
+
+      rpcClient!.registerMethod('aeskeyCodeVerify', (jrpc.Parameters params) {
+        var code = params['code'].asString;
+        var fromClient = params['from'].asString;
+        aesKeyCodeVerifyCallback(code, fromClient);
+      });
+
+      rpcClient!.registerMethod('messageFromClient', (jrpc.Parameters params) {
+        messageFromClient(params['from'].asString, params['message'].asString);
+      });
+    }
+    return rpcClient!;
+  }
+
+  prepareKeyExchange() async {
+    var client = await getRpcClient();
+    var _ = await client.sendRequest('prepareKeyExchange');
+  }
+
+  verifyAesExchangeCode(String code) async {
+    var client = await getRpcClient();
+    var _ = await client.sendRequest('verifyAesExchangeCode', {'code': code});
+  }
+
+  sendToClient(String to, String message) async {
+    var client = await getRpcClient();
+    var _ = await client
+        .sendRequest('sendToClient', {'to': to, 'message': message});
   }
 }
 

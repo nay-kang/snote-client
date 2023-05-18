@@ -77,3 +77,7 @@ doc/api/
 
 # vscode
 .vscode
+
+# podlock
+ios/Podfile.lock
+macos/Podfile.lock

@@ -34,3 +34,9 @@ if other client login, server tried to tell each other using LAN to exchange aes
 
 2023-03-31
 It seems snote can use client to client encryption like telegram. I will dig deeper about ECDH, I think that will help me to transport aes key between client. It only need both old client and new client online to exchange aes key.
+
+2023-04-18
+I'm not familiar with cryptography, the Diffie-Hellman can protect data exchange between insecurity connection. but I can not sure there will be other attack through long distance connection for now like man-in-the-middle. 
+maybe local net transport has more security.
+according to telegram, the DH encryption used with RSA which built public key into client so that only private key can descrypt. then I only ensure not lose my private key on the server. so I as provider is the only man-in-the-middle,so I have to keep my hands clean.
+I want to find other zero trust solution for this.
