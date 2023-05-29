@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -19,6 +20,9 @@ import 'package:json_rpc_2/json_rpc_2.dart' as jrpc;
 import 'package:pinput/pinput.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math';
+import 'package:device_info_plus/device_info_plus.dart';
+
+const String VERSION = '0.0.1';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -389,6 +393,7 @@ class SNoteAppState extends ChangeNotifier {
   }
 
   _messageFromClient(String from, String message) async {
+    // https://getstream.io/blog/end-to-end-encrypted-chat-in-flutter/
     var inData = json.decode(message);
     switch (inData['type']) {
       case 'publicKeyFromA':
@@ -525,6 +530,37 @@ class SNoteAppState extends ChangeNotifier {
   }
 }
 
+class HttpClient extends http.BaseClient {
+  late final http.Client _inner;
+  HttpClient._() {
+    _inner = http.Client();
+  }
+
+  late final String userAgent;
+  static HttpClient? _instance;
+  static Future<HttpClient> getInstance() async {
+    if (_instance == null) {
+      _instance = HttpClient._();
+      DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+      var info = await deviceInfo.deviceInfo;
+      var os = info.data['systemName'];
+      var osVersion = info.data['systemVersion'];
+      var model = info.data['name'];
+      _instance!.userAgent = "Snote/$VERSION $os/$osVersion ($model)";
+    }
+
+    return _instance!;
+  }
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    if (!kIsWeb) {
+      request.headers['User-Agent'] = userAgent;
+    }
+    return _inner.send(request);
+  }
+}
+
 class NoteService {
   AesGcmSecretKey? _encryptor;
   late String token;
@@ -559,7 +595,8 @@ class NoteService {
     String encContentStr = await _encrypt(jsonEncode(content));
     var header = getHeaders();
     var host = await getHost();
-    var response = await http.put(Uri.parse('$host/note/$id'),
+    var client = await HttpClient.getInstance();
+    var response = await client.put(Uri.parse('$host/note/$id'),
         headers: header,
         body: jsonEncode({
           'content': encContentStr,
@@ -585,7 +622,8 @@ class NoteService {
   Future<int> registClient(clientId) async {
     var host = await getHost();
     var headers = getHeaders();
-    var response = await http.put(
+    var client = await HttpClient.getInstance();
+    var response = await client.put(
       Uri.parse('$host/client/$clientId'),
       headers: headers,
     );
@@ -599,7 +637,8 @@ class NoteService {
     };
 
     var host = await getHost();
-    var response = await http.get(Uri.parse('$host/note/'), headers: header);
+    var client = await HttpClient.getInstance();
+    var response = await client.get(Uri.parse('$host/note/'), headers: header);
     List data = jsonDecode(response.body);
     var notesFutures = data.map((d) async {
       var n = (d as Map<String, dynamic>);

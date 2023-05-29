@@ -51,6 +51,7 @@ dependencies:
   json_rpc_2: ^3.0.2
   pinput: ^2.2.31
   google_fonts: ^4.0.4
+  device_info_plus: ^9.0.1
 
 
 dev_dependencies:
