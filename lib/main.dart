@@ -21,6 +21,8 @@ import 'package:pinput/pinput.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter_quill_extensions/flutter_quill_extensions.dart';
+import 'quill_image/main.dart' as quill_image;
 
 const String VERSION = '0.0.1';
 
@@ -85,7 +87,7 @@ class SNoteMain extends StatelessWidget {
           MaterialPageRoute(
               builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
                     value: appState,
-                    child: KeyExchangePop(),
+                    child: const KeyExchangePop(),
                   )));
     });
     appState.listenForAesKeyCodeGenerate(() {
@@ -155,6 +157,10 @@ class _BottomAppBar extends StatelessWidget {
   }
 }
 
+Iterable<quill.EmbedBuilder> embedBuilders = kIsWeb
+    ? [quill_image.ImageEmbedBuilderWeb()]
+    : FlutterQuillEmbeds.builders();
+
 class NoteCards extends StatelessWidget {
   const NoteCards({super.key});
 
@@ -186,6 +192,7 @@ class NoteCards extends StatelessWidget {
                     readOnly: true,
                     expands: false,
                     padding: EdgeInsets.zero,
+                    embedBuilders: embedBuilders,
                   ),
                 ),
               ),
@@ -208,6 +215,7 @@ class NoteCards extends StatelessWidget {
 class NoteEditor extends StatelessWidget {
   const NoteEditor({super.key, required this.note});
   final NoteModel note;
+
   @override
   Widget build(BuildContext context) {
     var appState = Provider.of<SNoteAppState>(context, listen: false);
@@ -234,7 +242,10 @@ class NoteEditor extends StatelessWidget {
       body: Column(children: [
         Expanded(
             child: quill.QuillEditor.basic(
-                controller: textController, readOnly: false)),
+          controller: textController,
+          readOnly: false,
+          embedBuilders: embedBuilders,
+        )),
         quill.QuillToolbar.basic(
           controller: textController,
           showAlignmentButtons: false,
@@ -266,6 +277,15 @@ class NoteEditor extends StatelessWidget {
           showStrikeThrough: false,
           showUnderLineButton: false,
           showUndo: false,
+          showSubscript: false,
+          showSuperscript: false,
+          embedButtons: FlutterQuillEmbeds.buttons(
+              showImageButton: true,
+              showCameraButton: false,
+              showFormulaButton: false,
+              showVideoButton: false,
+              onImagePickCallback: quill_image.onImagePickCallback,
+              webImagePickImpl: quill_image.webImagePickImpl),
         ),
       ]),
     );
@@ -308,7 +328,7 @@ class KeyExchangePop extends StatelessWidget {
 
     return Scaffold(
         body: Column(children: [
-      Text('Enter Code'),
+      const Text('Enter Code'),
       Pinput(
         length: 4,
         pinAnimationType: PinAnimationType.slide,
@@ -323,7 +343,7 @@ class KeyExchangePop extends StatelessWidget {
       const SizedBox(
         height: 44,
       ),
-      Text('please make one of your other client online to generate code')
+      const Text('please make one of your other client online to generate code')
     ]));
   }
 }
@@ -345,12 +365,12 @@ class KeyExchangeCodePop extends StatelessWidget {
 
     return Scaffold(
         body: Column(children: [
-      Text('Key Exchange Code'),
+      const Text('Key Exchange Code'),
       Text(code),
       const SizedBox(
         height: 44,
       ),
-      Text(
+      const Text(
           'your other client are requiring the important encryption key,enter this code to that client means let this device give key to that client')
     ]));
   }

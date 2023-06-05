@@ -40,3 +40,6 @@ I'm not familiar with cryptography, the Diffie-Hellman can protect data exchange
 maybe local net transport has more security.
 according to telegram, the DH encryption used with RSA which built public key into client so that only private key can descrypt. then I only ensure not lose my private key on the server. so I as provider is the only man-in-the-middle,so I have to keep my hands clean.
 I want to find other zero trust solution for this.
+
+2023-06-01
+stuck at quill image.I had fix so many problems but it still has more problem.I fixed the image base problem about cross platform.but now I need to customize image default width, I can't find a way. and futher I want the images always below the text,probably there is no way either. so I decide I write this by myself and integrate into quill. hope there has less problem.
