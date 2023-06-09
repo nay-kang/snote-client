@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,10 +22,12 @@ import 'package:pinput/pinput.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter_quill_extensions/flutter_quill_extensions.dart';
-import 'quill_image/main.dart' as quill_image;
+import 'util.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:logger/logger.dart';
 
-const String VERSION = '0.0.1';
+var logger = Logger();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -157,9 +160,79 @@ class _BottomAppBar extends StatelessWidget {
   }
 }
 
-Iterable<quill.EmbedBuilder> embedBuilders = kIsWeb
-    ? [quill_image.ImageEmbedBuilderWeb()]
-    : FlutterQuillEmbeds.builders();
+class NoteThumb extends StatelessWidget {
+  const NoteThumb({super.key, required this.note});
+  final NoteModel note;
+
+  @override
+  Widget build(BuildContext context) {
+    var appState = context.watch<SNoteAppState>();
+    var content = note.content;
+    Widget? quillWidgets;
+    List<Uint8List> images = [];
+    for (var d in content) {
+      switch (d['type']) {
+        case 'quill':
+          var textController = quill.QuillController.basic();
+          textController.document = quill.Document.fromJson(d['value']);
+          var quillWg = quill.QuillEditor(
+            controller: textController,
+            scrollController: ScrollController(),
+            scrollable: false,
+            focusNode: FocusNode(),
+            autoFocus: false,
+            readOnly: true,
+            expands: false,
+            padding: EdgeInsets.zero,
+          );
+          quillWidgets = quillWg;
+          break;
+        case 'image':
+          images.add(base64.decode(d['value']));
+          break;
+        default:
+          throw 'Not Support Datatype${d['type']}';
+      }
+    }
+
+    return GestureDetector(
+      child: Card(
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 300),
+          child: AbsorbPointer(
+            absorbing: true,
+            child: Stack(
+              children: [
+                quillWidgets!,
+                Container(
+                  height: 50,
+                  alignment: Alignment.bottomLeft,
+                  margin: const EdgeInsets.fromLTRB(0, 50, 0, 0),
+                  child: ListView.builder(
+                      itemCount: images.length,
+                      scrollDirection: Axis.horizontal,
+                      itemBuilder: (BuildContext context, int index) {
+                        return Image.memory(images[index]);
+                      }),
+                )
+              ],
+            ),
+          ),
+        ),
+      ),
+      onTap: () => {
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) =>
+                    ChangeNotifierProvider<SNoteAppState>.value(
+                      value: appState,
+                      child: NoteEditor(note: note),
+                    )))
+      },
+    );
+  }
+}
 
 class NoteCards extends StatelessWidget {
   const NoteCards({super.key});
@@ -174,67 +247,63 @@ class NoteCards extends StatelessWidget {
             maxCrossAxisExtent: 300),
         itemBuilder: (context, index) {
           var note = noteList[index];
-          var content = note.content;
-          final textController = quill.QuillController.basic();
-          textController.document = quill.Document.fromJson(content);
-          return GestureDetector(
-            child: Card(
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 300),
-                child: AbsorbPointer(
-                  absorbing: true,
-                  child: quill.QuillEditor(
-                    controller: textController,
-                    scrollController: ScrollController(),
-                    scrollable: false,
-                    focusNode: FocusNode(),
-                    autoFocus: false,
-                    readOnly: true,
-                    expands: false,
-                    padding: EdgeInsets.zero,
-                    embedBuilders: embedBuilders,
-                  ),
-                ),
-              ),
-            ),
-            onTap: () => {
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          ChangeNotifierProvider<SNoteAppState>.value(
-                            value: appState,
-                            child: NoteEditor(note: note),
-                          )))
-            },
-          );
+          return NoteThumb(note: note);
         });
   }
 }
 
 class NoteEditor extends StatelessWidget {
-  const NoteEditor({super.key, required this.note});
+  NoteEditor({super.key, required this.note});
   final NoteModel note;
 
+  final List imageData = [];
   @override
   Widget build(BuildContext context) {
     var appState = Provider.of<SNoteAppState>(context, listen: false);
     var content = note.content;
+    var quillContent;
+    for (var d in content) {
+      switch (d['type']) {
+        case 'quill':
+          quillContent = d['value'];
+          break;
+        case 'image':
+          imageData.add(base64.decode(d['value']));
+          break;
+        default:
+          throw 'not support type:${d['type']}';
+      }
+    }
     final textController = quill.QuillController.basic();
-    textController.document = quill.Document.fromJson(content);
-    // textController.addListener(
-    //   () {
-    //     appState.updateContent(
-    //         note.id, textController.document.toDelta().toJson());
-    //   },
-    // );
+    textController.document = quill.Document.fromJson(quillContent);
+
+    Function? addImage;
+    var imageBtn = quill.QuillCustomButton(
+      icon: const IconData(0xe332, fontFamily: 'MaterialIcons'),
+      tooltip: 'upload image',
+      onTap: () async {
+        var result = await FilePicker.platform.pickFiles(
+            type: FileType.image, allowMultiple: false, withData: true);
+        var imageBytes = result?.files.single.bytes;
+        imageBytes = await compressImage(imageBytes!);
+        addImage!(imageBytes);
+      },
+    );
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () {
-            appState.updateContent(
-                note.id, textController.document.toDelta().toJson());
+            List<dynamic> content = [];
+            content.add({
+              'type': 'quill',
+              'value': textController.document.toDelta().toJson()
+            });
+            for (var img in imageData) {
+              content.add({"type": 'image', "value": base64.encode(img)});
+            }
+            appState.updateContent(note.id, content);
             Navigator.pop(context);
           },
         ),
@@ -244,8 +313,40 @@ class NoteEditor extends StatelessWidget {
             child: quill.QuillEditor.basic(
           controller: textController,
           readOnly: false,
-          embedBuilders: embedBuilders,
         )),
+        SizedBox(
+          height: 100,
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              addImage = (Uint8List imageBytes) {
+                setState(() {
+                  imageData.add(imageBytes);
+                });
+              };
+              void deleteImage(Uint8List imageBytes) {
+                setState(() {
+                  imageData.remove(imageBytes);
+                });
+              }
+
+              return ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: imageData.length,
+                  itemBuilder: (context, index) {
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => ImageViewer(
+                                    imageData[index], deleteImage)));
+                      },
+                      child: Image.memory(imageData[index]),
+                    );
+                  });
+            },
+          ),
+        ),
         quill.QuillToolbar.basic(
           controller: textController,
           showAlignmentButtons: false,
@@ -279,15 +380,60 @@ class NoteEditor extends StatelessWidget {
           showUndo: false,
           showSubscript: false,
           showSuperscript: false,
-          embedButtons: FlutterQuillEmbeds.buttons(
-              showImageButton: true,
-              showCameraButton: false,
-              showFormulaButton: false,
-              showVideoButton: false,
-              onImagePickCallback: quill_image.onImagePickCallback,
-              webImagePickImpl: quill_image.webImagePickImpl),
+          customButtons: [imageBtn],
         ),
       ]),
+    );
+  }
+}
+
+class ImageViewer extends StatelessWidget {
+  // The image url
+  final Uint8List imageBytes;
+  final Function deleteImage;
+
+  const ImageViewer(this.imageBytes, this.deleteImage, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Image'),
+      ),
+      body: Center(
+        child: Stack(
+          children: [
+            // The PhotoView widget that displays the image
+            PhotoView(
+              imageProvider: MemoryImage(imageBytes),
+              // The size of the image widget
+              // customSize: Size(300, 300),
+            ),
+            Positioned(
+              bottom: 10,
+              left: 10,
+              child: GestureDetector(
+                onTap: () {
+                  deleteImage(imageBytes);
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.remove,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -402,7 +548,7 @@ class SNoteAppState extends ChangeNotifier {
   Uint8List? _tempEncryptKey;
   _aesKeyCodeVerifyCallback(String code, String from) async {
     if (code != this.code) {
-      print('code not match');
+      logger.w('code not match');
       return;
     }
     var keyPair = await EcdhPrivateKey.generateKey(EllipticCurve.p256);
@@ -465,7 +611,7 @@ class SNoteAppState extends ChangeNotifier {
         _aesKeyExchangeDoneCallback!();
         break;
       default:
-        print("unkown message type from client ${inData['type']}");
+        logger.w("unkown message type from client ${inData['type']}");
     }
   }
 
@@ -566,7 +712,9 @@ class HttpClient extends http.BaseClient {
       var os = info.data['systemName'];
       var osVersion = info.data['systemVersion'];
       var model = info.data['name'];
-      _instance!.userAgent = "Snote/$VERSION $os/$osVersion ($model)";
+      var packageInfo = await PackageInfo.fromPlatform();
+      _instance!.userAgent =
+          "Snote/${packageInfo.version} $os/$osVersion ($model)";
     }
 
     return _instance!;
@@ -760,7 +908,9 @@ class NoteModel {
     if (content == null) {
       var delta = quill.Delta();
       delta.insert('\n');
-      content = delta.toJson();
+      content = [
+        {'type': 'quill', 'value': delta.toJson()}
+      ];
     }
     this.content = content;
     if (createdAt != null) {
