@@ -1,4 +1,4 @@
-package com.example.snote
+package net.codeedu.snote
 
 import io.flutter.embedding.android.FlutterActivity
 

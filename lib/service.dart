@@ -259,7 +259,7 @@ class NoteService {
     var header = getHeaders();
     var host = await getHost();
     var client = await HttpClient.getInstance();
-    var response = await client.put(Uri.parse('$host/note/$id'),
+    var response = await client.put(Uri.parse('$host/api/note/$id'),
         headers: header,
         body: jsonEncode({
           'content': encContentStr,
@@ -287,7 +287,7 @@ class NoteService {
     var headers = getHeaders();
     var client = await HttpClient.getInstance();
     var response = await client.put(
-      Uri.parse('$host/client/$clientId'),
+      Uri.parse('$host/api/client/$clientId'),
       headers: headers,
     );
     Map<String, dynamic> data = jsonDecode(response.body);
@@ -301,7 +301,8 @@ class NoteService {
 
     var host = await getHost();
     var client = await HttpClient.getInstance();
-    var response = await client.get(Uri.parse('$host/note/'), headers: header);
+    var response =
+        await client.get(Uri.parse('$host/api/note/'), headers: header);
     List data = jsonDecode(response.body);
     var notesFutures = data.map((d) async {
       var n = (d as Map<String, dynamic>);
@@ -344,7 +345,7 @@ class NoteService {
     if (rpcClient == null) {
       var host = await getHost();
       host = host.replaceAll('http', 'ws');
-      var uri = Uri.parse("$host/ws/");
+      var uri = Uri.parse("$host/api/ws/");
       var channel = WebSocketChannel.connect(uri);
       rpcClient = jrpc.Peer(channel.cast<String>());
 
