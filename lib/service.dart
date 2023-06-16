@@ -207,10 +207,20 @@ class HttpClient extends http.BaseClient {
       _instance = HttpClient._();
       DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
       var info = await deviceInfo.deviceInfo;
-      var os = info.data['systemName'];
-      var osVersion = info.data['systemVersion'];
-      var model = info.data['name'];
+      String os = '', osVersion = '', model = '';
+      if (Platform.isAndroid) {
+        info = info as AndroidDeviceInfo;
+        os = 'Android';
+        osVersion = info.version.release;
+        model = info.device;
+      } else if (Platform.isIOS) {
+        info = info as IosDeviceInfo;
+        os = 'iOS';
+        osVersion = info.systemVersion;
+        model = info.utsname.machine;
+      }
       var packageInfo = await PackageInfo.fromPlatform();
+
       _instance!.userAgent =
           "Snote/${packageInfo.version} $os/$osVersion ($model)";
     }
@@ -350,8 +360,15 @@ class NoteService {
       host = host.replaceAll('http', 'ws');
       var uri = Uri.parse("$host/api/ws/");
       var channel = WebSocketChannel.connect(uri);
-      rpcClient = jrpc.Peer(channel.cast<String>());
 
+      rpcClient = jrpc.Peer(channel.cast<String>());
+      rpcClient!.done.then(
+        (value) {
+          logger.w('websocket closed!');
+          rpcClient = null;
+          getRpcClient();
+        },
+      );
       unawaited(rpcClient!.listen());
       var _ = await rpcClient!.sendRequest('auth', {'token': token});
 

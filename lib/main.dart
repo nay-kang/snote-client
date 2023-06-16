@@ -72,10 +72,14 @@ class SNoteMain extends StatelessWidget {
           isDismissible: true,
           enableDrag: true,
           showDragHandle: true,
+          isScrollControlled: true,
           builder: (context) {
             return ChangeNotifierProvider<SNoteAppState>.value(
               value: appState,
-              child: const KeyExchangePop(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.8,
+                child: const KeyExchangePop(),
+              ),
             );
           });
     });
@@ -85,10 +89,14 @@ class SNoteMain extends StatelessWidget {
           isDismissible: true,
           enableDrag: true,
           showDragHandle: true,
+          isScrollControlled: true,
           builder: (context) {
             return ChangeNotifierProvider<SNoteAppState>.value(
               value: appState,
-              child: const KeyExchangeCodePop(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.8,
+                child: const KeyExchangeCodePop(),
+              ),
             );
           });
     });
