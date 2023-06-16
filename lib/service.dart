@@ -145,7 +145,6 @@ class SNoteAppState extends ChangeNotifier {
           }
           if (aesKeyBase64 == null) {
             _aesKeyRequireCallback!();
-            noteService.prepareKeyExchange();
           } else {
             mainAesKey = base64.decode(aesKeyBase64);
             noteService.setAesKey(mainAesKey!);
@@ -157,6 +156,10 @@ class SNoteAppState extends ChangeNotifier {
         }();
       },
     );
+  }
+
+  void prepareKeyExchange() {
+    noteService.prepareKeyExchange();
   }
 
   List<dynamic> getById(String id) {

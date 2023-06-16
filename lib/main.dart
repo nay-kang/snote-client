@@ -62,43 +62,35 @@ class SNoteApp extends StatelessWidget {
 class SNoteMain extends StatelessWidget {
   const SNoteMain({super.key});
 
-  // static Route<void> _keyExchangePopup(
-  //     BuildContext context, Object? arguments) {
-  //   return MaterialPageRoute<void>(
-  //     builder: (BuildContext context) => KeyExchangePop(),
-  //     fullscreenDialog: true,
-  //   );
-  // }
-
   @override
   Widget build(BuildContext context) {
     var appState = Provider.of<SNoteAppState>(context, listen: false);
 
     appState.listenForAesKeyRequire(() {
-      // Navigator.restorablePush(context, _keyExchangePopup);
-      Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
-                    value: appState,
-                    child: const KeyExchangePop(),
-                  )));
+      showModalBottomSheet(
+          context: context,
+          isDismissible: true,
+          enableDrag: true,
+          showDragHandle: true,
+          builder: (context) {
+            return ChangeNotifierProvider<SNoteAppState>.value(
+              value: appState,
+              child: const KeyExchangePop(),
+            );
+          });
     });
     appState.listenForAesKeyCodeGenerate(() {
-      // Navigator.restorablePush(context, _keyExchangeCodePopup);
-      // print(context);
-      // Navigator.push(
-      //     context,
-      //     MaterialPageRoute(
-      //         builder: (BuildContext contenxt) => KeyExchangeCodePop(),
-      //         fullscreenDialog: true));
-      Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
-                    value: appState,
-                    child: const KeyExchangeCodePop(),
-                  )));
+      showModalBottomSheet(
+          context: context,
+          isDismissible: true,
+          enableDrag: true,
+          showDragHandle: true,
+          builder: (context) {
+            return ChangeNotifierProvider<SNoteAppState>.value(
+              value: appState,
+              child: const KeyExchangeCodePop(),
+            );
+          });
     });
     appState.checkAesKey();
     return MaterialApp(
@@ -435,6 +427,7 @@ class KeyExchangePop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = Provider.of<SNoteAppState>(context);
+    appState.prepareKeyExchange();
     appState.listenForAesKeyExchangeDone(() {
       appState.checkAesKey();
       Navigator.pop(context);
@@ -463,8 +456,8 @@ class KeyExchangePop extends StatelessWidget {
       ],
     );
 
-    return Scaffold(
-        body: Column(children: [
+    return Center(
+        child: Column(children: [
       const Text('Enter Code'),
       Pinput(
         length: 4,
@@ -473,6 +466,7 @@ class KeyExchangePop extends StatelessWidget {
         defaultPinTheme: defaultPinTheme,
         showCursor: true,
         preFilledWidget: preFilledWidget,
+        autofocus: true,
         onCompleted: (value) {
           appState.verifyAesExchangeCode(value);
         },
@@ -480,7 +474,13 @@ class KeyExchangePop extends StatelessWidget {
       const SizedBox(
         height: 44,
       ),
-      const Text('please make one of your other client online to generate code')
+      const Text('Please open your other client to generate code'),
+      ElevatedButton.icon(
+          onPressed: () {
+            appState.prepareKeyExchange();
+          },
+          icon: const Icon(Icons.refresh),
+          label: const Text('Try Again')),
     ]));
   }
 }
@@ -500,15 +500,21 @@ class KeyExchangeCodePop extends StatelessWidget {
     );
     appState.setAesExchangeCode(code);
 
-    return Scaffold(
-        body: Column(children: [
+    return Center(
+        child: Column(children: [
       const Text('Key Exchange Code'),
-      Text(code),
       const SizedBox(
-        height: 44,
+        height: 30,
+      ),
+      Text(
+        code,
+        style: const TextStyle(color: Colors.blue, fontSize: 30),
+      ),
+      const SizedBox(
+        height: 30,
       ),
       const Text(
-          'your other client are requiring the important encryption key,enter this code to that client means let this device give key to that client')
+          'One of your client are requiring the important encryption key\nWhen this code typed means authorize that client to decode your notes')
     ]));
   }
 }
