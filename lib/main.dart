@@ -26,35 +26,36 @@ Future<void> main() async {
   runApp(const SNoteApp());
 }
 
-class SNoteApp extends StatelessWidget {
-  const SNoteApp({super.key});
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
 
   @override
   Widget build(BuildContext context) {
     var authProviders = [EmailAuthProvider()];
     var appState = SNoteAppState();
-
-    return MaterialApp(
-      initialRoute:
-          FirebaseAuth.instance.currentUser == null ? '/sign-in' : '/index',
-      routes: {
-        '/sign-in': (context) {
-          return SignInScreen(
-            providers: authProviders,
-            actions: [
-              AuthStateChangeAction<SignedIn>((context, state) {
-                Navigator.pushReplacementNamed(context, '/index');
-              })
-            ],
-          );
-        },
-        '/index': (context) {
+    return StreamBuilder(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, authState) {
+          if (!authState.hasData) {
+            return SignInScreen(
+              providers: authProviders,
+            );
+          }
           return ChangeNotifierProvider(
             create: (context) => appState,
             child: const SNoteMain(),
           );
-        }
-      },
+        });
+  }
+}
+
+class SNoteApp extends StatelessWidget {
+  const SNoteApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      home: AuthGate(),
     );
   }
 }
@@ -121,6 +122,25 @@ class SNoteMain extends StatelessWidget {
           ),
           floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
           bottomNavigationBar: const _BottomAppBar(),
+          drawer: Drawer(
+              child: ListView(
+            children: [
+              const DrawerHeader(child: Text('Profile')),
+              ListTile(
+                title: const Text('devices'),
+                onTap: () {
+                  Navigator.pop(context);
+                  logger.d('devices button tapped');
+                },
+              ),
+              ListTile(
+                title: const Text('logout'),
+                onTap: () {
+                  FirebaseAuth.instance.signOut();
+                },
+              )
+            ],
+          )),
         ),
       ),
     );
@@ -142,7 +162,9 @@ class _BottomAppBar extends StatelessWidget {
             IconButton(
               tooltip: 'Open navigation menu',
               icon: const Icon(Icons.menu),
-              onPressed: () {},
+              onPressed: () {
+                Scaffold.of(context).openDrawer();
+              },
             ),
           ],
         ),
