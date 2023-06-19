@@ -247,6 +247,22 @@ class NoteEditor extends StatelessWidget {
   NoteEditor({super.key, required this.note});
   final NoteModel note;
 
+  Widget generatePopupMenu(
+      SNoteAppState state, NoteModel note, BuildContext context) {
+    return PopupMenuButton(itemBuilder: (context) {
+      return <PopupMenuEntry<dynamic>>[
+        PopupMenuItem(
+          child: const Text('Delete'),
+          onTap: () {
+            state.deleteNote(note).then((_) {
+              Navigator.pop(context);
+            });
+          },
+        ),
+      ];
+    });
+  }
+
   final List imageData = [];
   @override
   Widget build(BuildContext context) {
@@ -338,40 +354,46 @@ class NoteEditor extends StatelessWidget {
             },
           ),
         ),
-        quill.QuillToolbar.basic(
-          controller: textController,
-          showAlignmentButtons: false,
-          showBackgroundColorButton: false,
-          showBoldButton: false,
-          showCenterAlignment: false,
-          showClearFormat: false,
-          showCodeBlock: false,
-          showColorButton: false,
-          showDirection: false,
-          showDividers: false,
-          showFontFamily: false,
-          showFontSize: false,
-          showHeaderStyle: false,
-          showIndent: false,
-          showInlineCode: false,
-          showItalicButton: false,
-          showJustifyAlignment: false,
-          showLeftAlignment: false,
-          showLink: false,
-          showListBullets: true,
-          showListCheck: true,
-          showListNumbers: false,
-          showQuote: false,
-          showRedo: false,
-          showRightAlignment: false,
-          showSearchButton: false,
-          showSmallButton: false,
-          showStrikeThrough: false,
-          showUnderLineButton: false,
-          showUndo: false,
-          showSubscript: false,
-          showSuperscript: false,
-          customButtons: [imageBtn],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            quill.QuillToolbar.basic(
+              controller: textController,
+              showAlignmentButtons: false,
+              showBackgroundColorButton: false,
+              showBoldButton: false,
+              showCenterAlignment: false,
+              showClearFormat: false,
+              showCodeBlock: false,
+              showColorButton: false,
+              showDirection: false,
+              showDividers: false,
+              showFontFamily: false,
+              showFontSize: false,
+              showHeaderStyle: false,
+              showIndent: false,
+              showInlineCode: false,
+              showItalicButton: false,
+              showJustifyAlignment: false,
+              showLeftAlignment: false,
+              showLink: false,
+              showListBullets: true,
+              showListCheck: true,
+              showListNumbers: false,
+              showQuote: false,
+              showRedo: false,
+              showRightAlignment: false,
+              showSearchButton: false,
+              showSmallButton: false,
+              showStrikeThrough: false,
+              showUnderLineButton: false,
+              showUndo: false,
+              showSubscript: false,
+              showSuperscript: false,
+              customButtons: [imageBtn],
+            ),
+            generatePopupMenu(appState, note, context)
+          ],
         ),
       ]),
     );

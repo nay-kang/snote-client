@@ -184,6 +184,12 @@ class SNoteAppState extends ChangeNotifier {
     return note;
   }
 
+  Future<void> deleteNote(NoteModel note) async {
+    await noteService.deleteNote(note.id);
+    noteList.remove(note);
+    notifyListeners();
+  }
+
   late String code;
   setAesExchangeCode(String code) {
     this.code = code;
@@ -208,7 +214,9 @@ class HttpClient extends http.BaseClient {
       DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
       var info = await deviceInfo.deviceInfo;
       String os = '', osVersion = '', model = '';
-      if (Platform.isAndroid) {
+      if (kIsWeb) {
+        // do nothng
+      } else if (Platform.isAndroid) {
         info = info as AndroidDeviceInfo;
         os = 'Android';
         osVersion = info.version.release;
@@ -286,6 +294,16 @@ class NoteService {
         createdAt: data['created_at'],
         updatedAt: data['updated_at']);
     return note;
+  }
+
+  Future<void> deleteNote(String id) async {
+    var header = getHeaders();
+    var host = await getHost();
+    var client = await HttpClient.getInstance();
+    var _ = await client.delete(
+      Uri.parse('$host/api/note/$id'),
+      headers: header,
+    );
   }
 
   Map<String, String> getHeaders() {
