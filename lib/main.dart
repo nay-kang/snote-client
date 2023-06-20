@@ -257,7 +257,7 @@ class NoteCards extends StatelessWidget {
     var noteList = appState.noteList;
     return RefreshIndicator(
         onRefresh: () async {
-          await appState.checkAesKey();
+          await appState.refreshNotes();
         },
         child: MasonryGridView.builder(
             itemCount: noteList.length,
@@ -310,6 +310,7 @@ class NoteEditor extends StatelessWidget {
     }
     final textController = quill.QuillController.basic();
     textController.document = quill.Document.fromJson(quillContent);
+    textController.moveCursorToEnd();
 
     Function? addImage;
     var imageBtn = quill.QuillCustomButton(
