@@ -116,6 +116,16 @@ class SNoteAppState extends ChangeNotifier {
     }
   }
 
+  Future<void> _noteUpdatedCallback(String eventAt) async {
+    var date = DateTime.parse(eventAt);
+    if (noteList.isNotEmpty &&
+        // if updatedAt is null means this is newly created note
+        noteList[0].updatedAt != null &&
+        noteList[0].updatedAt!.compareTo(date) < 0) {
+      refreshNotes();
+    }
+  }
+
   Uint8List? mainAesKey;
   late FlutterSecureStorage seStorage;
   Future<void> checkAesKey() async {
@@ -130,7 +140,7 @@ class SNoteAppState extends ChangeNotifier {
     seStorage = const FlutterSecureStorage();
 
     noteService = NoteService(token!, _aesKeyCodeCallback!,
-        _aesKeyCodeVerifyCallback, _messageFromClient);
+        _aesKeyCodeVerifyCallback, _messageFromClient, _noteUpdatedCallback);
     var clientId = await seStorage.read(key: 'client_id');
     if (clientId == null) {
       var uuid = const Uuid();
@@ -152,11 +162,15 @@ class SNoteAppState extends ChangeNotifier {
       mainAesKey = base64.decode(aesKeyBase64);
       noteService.setAesKey(mainAesKey!);
       await noteService.getRpcClient();
-      var notes = await noteService.loadNotesHttp();
-      noteList.clear();
-      noteList.addAll(notes);
-      notifyListeners();
+      await refreshNotes();
     }
+  }
+
+  Future<void> refreshNotes() async {
+    var notes = await noteService.loadNotesHttp();
+    noteList.clear();
+    noteList.addAll(notes);
+    notifyListeners();
   }
 
   void prepareKeyExchange() {
@@ -254,8 +268,13 @@ class NoteService {
   Function aesKeyCodeCallback;
   Function aesKeyCodeVerifyCallback;
   Function messageFromClient;
-  NoteService(this.token, this.aesKeyCodeCallback,
-      this.aesKeyCodeVerifyCallback, this.messageFromClient);
+  Function noteUpdatedCallback;
+  NoteService(
+      this.token,
+      this.aesKeyCodeCallback,
+      this.aesKeyCodeVerifyCallback,
+      this.messageFromClient,
+      this.noteUpdatedCallback);
 
   Future<AesGcmSecretKey> getEncryptor() async {
     _encryptor ??= await AesGcmSecretKey.importRawKey(aesKey!);
@@ -403,6 +422,10 @@ class NoteService {
 
       rpcClient!.registerMethod('messageFromClient', (jrpc.Parameters params) {
         messageFromClient(params['from'].asString, params['message'].asString);
+      });
+
+      rpcClient!.registerMethod('noteUpdated', (jrpc.Parameters params) {
+        noteUpdatedCallback(params['eventAt'].asString);
       });
     }
     return rpcClient!;
