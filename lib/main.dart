@@ -102,6 +102,7 @@ class SNoteMain extends StatelessWidget {
           });
     });
     appState.checkAesKey();
+
     return MaterialApp(
       theme: ThemeData(
           useMaterial3: false,
@@ -254,14 +255,18 @@ class NoteCards extends StatelessWidget {
   Widget build(BuildContext context) {
     var appState = context.watch<SNoteAppState>();
     var noteList = appState.noteList;
-    return MasonryGridView.builder(
-        itemCount: noteList.length,
-        gridDelegate: const SliverSimpleGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 300),
-        itemBuilder: (context, index) {
-          var note = noteList[index];
-          return NoteThumb(note: note);
-        });
+    return RefreshIndicator(
+        onRefresh: () async {
+          await appState.checkAesKey();
+        },
+        child: MasonryGridView.builder(
+            itemCount: noteList.length,
+            gridDelegate: const SliverSimpleGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 300),
+            itemBuilder: (context, index) {
+              var note = noteList[index];
+              return NoteThumb(note: note);
+            }));
   }
 }
 

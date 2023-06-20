@@ -21,6 +21,12 @@ class SNoteAppState extends ChangeNotifier {
   List<NoteModel> noteList = [];
   String? token;
   late NoteService noteService;
+  User? firebaseUser;
+  SNoteAppState() {
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      firebaseUser = user;
+    });
+  }
 
   listenForAesKeyRequire(Function aesKeyRequireCallback) {
     _aesKeyRequireCallback = aesKeyRequireCallback;
@@ -112,50 +118,45 @@ class SNoteAppState extends ChangeNotifier {
 
   Uint8List? mainAesKey;
   late FlutterSecureStorage seStorage;
-  checkAesKey() async {
-    FirebaseAuth.instance.authStateChanges().listen(
-      (User? user) {
-        () async {
-          if (user == null) {
-            return;
-          }
-          token = await user.getIdToken();
-          if (token == null) {
-            return;
-          }
+  Future<void> checkAesKey() async {
+    if (firebaseUser == null) {
+      return;
+    }
+    token = await firebaseUser!.getIdToken();
+    if (token == null) {
+      return;
+    }
 
-          seStorage = const FlutterSecureStorage();
+    seStorage = const FlutterSecureStorage();
 
-          noteService = NoteService(token!, _aesKeyCodeCallback!,
-              _aesKeyCodeVerifyCallback, _messageFromClient);
-          var clientId = await seStorage.read(key: 'client_id');
-          if (clientId == null) {
-            var uuid = const Uuid();
-            clientId = uuid.v4().toString();
-            await seStorage.write(key: 'client_id', value: clientId);
-          }
-          var clientCount = await noteService.registClient(clientId);
+    noteService = NoteService(token!, _aesKeyCodeCallback!,
+        _aesKeyCodeVerifyCallback, _messageFromClient);
+    var clientId = await seStorage.read(key: 'client_id');
+    if (clientId == null) {
+      var uuid = const Uuid();
+      clientId = uuid.v4().toString();
+      await seStorage.write(key: 'client_id', value: clientId);
+    }
+    var clientCount = await noteService.registClient(clientId);
 
-          var aesKeyBase64 = await seStorage.read(key: 'note_aes_key');
-          if (aesKeyBase64 == null && clientCount <= 1) {
-            var aesKey = Uint8List(32);
-            fillRandomBytes(aesKey);
-            aesKeyBase64 = base64.encode(aesKey);
-            await seStorage.write(key: 'note_aes_key', value: aesKeyBase64);
-          }
-          if (aesKeyBase64 == null) {
-            _aesKeyRequireCallback!();
-          } else {
-            mainAesKey = base64.decode(aesKeyBase64);
-            noteService.setAesKey(mainAesKey!);
-            await noteService.getRpcClient();
-            var notes = await noteService.loadNotesHttp();
-            noteList.addAll(notes);
-            notifyListeners();
-          }
-        }();
-      },
-    );
+    var aesKeyBase64 = await seStorage.read(key: 'note_aes_key');
+    if (aesKeyBase64 == null && clientCount <= 1) {
+      var aesKey = Uint8List(32);
+      fillRandomBytes(aesKey);
+      aesKeyBase64 = base64.encode(aesKey);
+      await seStorage.write(key: 'note_aes_key', value: aesKeyBase64);
+    }
+    if (aesKeyBase64 == null) {
+      _aesKeyRequireCallback!();
+    } else {
+      mainAesKey = base64.decode(aesKeyBase64);
+      noteService.setAesKey(mainAesKey!);
+      await noteService.getRpcClient();
+      var notes = await noteService.loadNotesHttp();
+      noteList.clear();
+      noteList.addAll(notes);
+      notifyListeners();
+    }
   }
 
   void prepareKeyExchange() {
