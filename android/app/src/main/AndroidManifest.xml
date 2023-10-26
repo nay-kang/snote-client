@@ -1,9 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="net.codeedu.snote">
+    package="net.codeedu.snote" xmlns:tools="http://schemas.android.com/tools">
    <application
         android:label="snote"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher" tools:replace="android:label">
         <activity
             android:name=".MainActivity"
             android:exported="true"

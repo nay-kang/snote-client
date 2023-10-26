@@ -63,6 +63,9 @@ android {
             signingConfig signingConfigs.debug
         }
     }
+    configurations {
+        all*.exclude group: 'eu.simonbinder', module: 'sqlite3-native-library'
+    }
 }
 
 flutter {

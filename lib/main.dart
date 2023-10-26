@@ -66,7 +66,6 @@ class SNoteMain extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = Provider.of<SNoteAppState>(context, listen: false);
-
     appState.listenForAesKeyRequire(() {
       showModalBottomSheet(
           context: context,
@@ -189,15 +188,20 @@ class NoteThumb extends StatelessWidget {
         case 'quill':
           var textController = quill.QuillController.basic();
           textController.document = quill.Document.fromJson(d['value']);
-          var quillWg = quill.QuillEditor(
-            controller: textController,
-            scrollController: ScrollController(),
-            scrollable: false,
-            focusNode: FocusNode(),
-            autoFocus: false,
-            readOnly: true,
-            expands: false,
-            padding: EdgeInsets.zero,
+          var quillWg = quill.QuillProvider(
+            configurations:
+                quill.QuillConfigurations(controller: textController),
+            child: quill.QuillEditor(
+              configurations: const quill.QuillEditorConfigurations(
+                scrollable: false,
+                autoFocus: false,
+                readOnly: true,
+                expands: false,
+                padding: EdgeInsets.zero,
+              ),
+              scrollController: ScrollController(),
+              focusNode: FocusNode(),
+            ),
           );
           quillWidgets = quillWg;
           break;
@@ -314,7 +318,7 @@ class NoteEditor extends StatelessWidget {
 
     Function? addImage;
     var imageBtn = quill.QuillCustomButton(
-      icon: const IconData(0xe332, fontFamily: 'MaterialIcons'),
+      iconData: const IconData(0xe332, fontFamily: 'MaterialIcons'),
       tooltip: 'upload image',
       onTap: () async {
         var result = await FilePicker.platform.pickFiles(
@@ -345,9 +349,9 @@ class NoteEditor extends StatelessWidget {
       ),
       body: Column(children: [
         Expanded(
-            child: quill.QuillEditor.basic(
-          controller: textController,
-          readOnly: false,
+            child: quill.QuillProvider(
+          configurations: quill.QuillConfigurations(controller: textController),
+          child: quill.QuillEditor.basic(),
         )),
         SizedBox(
           height: 100,
@@ -385,41 +389,45 @@ class NoteEditor extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            quill.QuillToolbar.basic(
-              controller: textController,
-              showAlignmentButtons: false,
-              showBackgroundColorButton: false,
-              showBoldButton: false,
-              showCenterAlignment: false,
-              showClearFormat: false,
-              showCodeBlock: false,
-              showColorButton: false,
-              showDirection: false,
-              showDividers: false,
-              showFontFamily: false,
-              showFontSize: false,
-              showHeaderStyle: false,
-              showIndent: false,
-              showInlineCode: false,
-              showItalicButton: false,
-              showJustifyAlignment: false,
-              showLeftAlignment: false,
-              showLink: false,
-              showListBullets: true,
-              showListCheck: true,
-              showListNumbers: false,
-              showQuote: false,
-              showRedo: false,
-              showRightAlignment: false,
-              showSearchButton: false,
-              showSmallButton: false,
-              showStrikeThrough: false,
-              showUnderLineButton: false,
-              showUndo: false,
-              showSubscript: false,
-              showSuperscript: false,
-              customButtons: [imageBtn],
-            ),
+            quill.QuillProvider(
+                configurations:
+                    quill.QuillConfigurations(controller: textController),
+                child: quill.QuillToolbar(
+                  configurations: quill.QuillToolbarConfigurations(
+                    showAlignmentButtons: false,
+                    showBackgroundColorButton: false,
+                    showBoldButton: false,
+                    showCenterAlignment: false,
+                    showClearFormat: false,
+                    showCodeBlock: false,
+                    showColorButton: false,
+                    showDirection: false,
+                    showDividers: false,
+                    showFontFamily: false,
+                    showFontSize: false,
+                    showHeaderStyle: false,
+                    showIndent: false,
+                    showInlineCode: false,
+                    showItalicButton: false,
+                    showJustifyAlignment: false,
+                    showLeftAlignment: false,
+                    showLink: false,
+                    showListBullets: true,
+                    showListCheck: true,
+                    showListNumbers: false,
+                    showQuote: false,
+                    showRedo: false,
+                    showRightAlignment: false,
+                    showSearchButton: false,
+                    showSmallButton: false,
+                    showStrikeThrough: false,
+                    showUnderLineButton: false,
+                    showUndo: false,
+                    showSubscript: false,
+                    showSuperscript: false,
+                    customButtons: [imageBtn],
+                  ),
+                )),
             generatePopupMenu(appState, note, context)
           ],
         ),
