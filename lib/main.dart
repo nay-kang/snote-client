@@ -261,7 +261,7 @@ class NoteCards extends StatelessWidget {
     var noteList = appState.noteList;
     return RefreshIndicator(
         onRefresh: () async {
-          await appState.refreshNotes();
+          await appState.fetchNotes(refresh: true);
         },
         child: MasonryGridView.builder(
             itemCount: noteList.length,

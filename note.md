@@ -82,3 +82,14 @@ Try to add libsimple to android project.previously I successed compile libsimple
 stuck at link web plugin javascript assets for two days.there is no anwser about this,the nearest result is import_js_plugin,but it's too old can not compatible with dart3.  
 I want learn from exists packages, but most package do not have local javascript asset.finally I found fluttertoast has local javascript,And I learned that the link partten of local javascript is `assets/packages/$package_name/$package_assset_path`,in my package the path is `assets/packages/libsimple_flutter/assets/sqlite3bridge.js`.  
 the fluttertoast using `ui.webOnlyAssetManager.getAssetUrl` to translate url,but I do not find offical document about this.
+
+2023-10-30
+the problem of sync deleted content.there are two type of deletion,soft and hard,soft just change note status and can be restore. hard is truely delete from recycle bin and free up space.
+because it's purged in under layer,so there should no way to let other client knows unless make storage for the deletions even it using message queue.  
+so at current stage I still store the deletions in database,but wipe the note content only keep the note id. and this will deleted untill all client is newer then this.
+DB prepare statement.currently I can only allow execute raw sql in web wasm.but the note content are in many kinds of.I need prepare statement.  
+but wait,because the content are in many forms,I already encode it to JSON,so I can save it into database.solved! but as a public plugin,I should add prepare statement support.
+
+2023-11-02
+get stucked at "Cross-Origin-Embedder-Policy".the jsdelivr do not support add this header,the flutter local dev server would not support either.and I after switch to https server and add headers, it also need me to run in worker.I test that with sqlite offical demo-123-worker.and I had to change oo1.DB to oo1.OpfsDb().
+next I had to figure out how to make worker postMessage works like function call the could return query result.

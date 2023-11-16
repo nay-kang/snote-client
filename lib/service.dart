@@ -14,6 +14,7 @@ import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import 'package:json_rpc_2/json_rpc_2.dart' as jrpc;
 import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:libsimple_flutter/libsimple_flutter.dart';
 
 var logger = Logger();
 
@@ -122,7 +123,7 @@ class SNoteAppState extends ChangeNotifier {
         // if updatedAt is null means this is newly created note
         noteList[0].updatedAt != null &&
         noteList[0].updatedAt!.compareTo(date) < 0) {
-      refreshNotes();
+      fetchNotes();
     }
   }
 
@@ -162,14 +163,39 @@ class SNoteAppState extends ChangeNotifier {
       mainAesKey = base64.decode(aesKeyBase64);
       noteService.setAesKey(mainAesKey!);
       await noteService.getRpcClient();
-      await refreshNotes();
+      await fetchNotes();
     }
   }
 
-  Future<void> refreshNotes() async {
-    var notes = await noteService.loadNotesHttp();
+  Future<void> fetchNotes({bool refresh = false}) async {
+    var db = NoteDB();
+    if (refresh) {
+      await db.clear();
+    }
+    var localNotes = await db.getList();
     noteList.clear();
-    noteList.addAll(notes);
+    noteList.addAll(localNotes);
+    // display local notes immediately
+    if (refresh == false) {
+      notifyListeners();
+    }
+    var lastTimestamp = await db.getLastUpdatedAt();
+    var remoteNotes = await noteService.loadNotesHttp(lastTimestamp);
+    mergeNotes(localNotes, remoteNotes);
+  }
+
+  mergeNotes(List<NoteModel> local, List<NoteModel> remote) {
+    var db = NoteDB();
+    for (var note in remote.reversed) {
+      db.save(note);
+      int index = local.indexWhere((element) => element.id == note.id);
+      if (index > -1) {
+        local.removeAt(index);
+      }
+    }
+    local = remote + local;
+    noteList.clear();
+    noteList.addAll(local);
     notifyListeners();
   }
 
@@ -188,6 +214,8 @@ class SNoteAppState extends ChangeNotifier {
       noteList.remove(note);
       noteList.insert(0, value);
       notifyListeners();
+      var db = NoteDB();
+      db.save(value);
     });
     notifyListeners();
   }
@@ -345,15 +373,19 @@ class NoteService {
     return data['client_count'];
   }
 
-  Future<List<NoteModel>> loadNotesHttp() async {
+  Future<List<NoteModel>> loadNotesHttp([DateTime? updatedAt]) async {
     var header = {
       HttpHeaders.authorizationHeader: 'Bearer $token',
     };
-
+    String params = "?";
+    if (updatedAt != null) {
+      var dateStr = updatedAt.toUtc().toIso8601String();
+      params += "updated_at=[$dateStr:]";
+    }
     var host = await getHost();
     var client = await HttpClient.getInstance();
     var response =
-        await client.get(Uri.parse('$host/api/note/'), headers: header);
+        await client.get(Uri.parse('$host/api/note/$params'), headers: header);
     List data = jsonDecode(response.body);
     var notesFutures = data.map((d) async {
       var n = (d as Map<String, dynamic>);
@@ -477,5 +509,100 @@ class NoteModel {
     if (updatedAt != null) {
       this.updatedAt = DateTime.parse(updatedAt);
     }
+  }
+}
+
+class NoteDB {
+  //singleton in dart to prevent multi instance operate on one database
+  static final NoteDB _instance = NoteDB._internal();
+  NoteDB._internal();
+  factory NoteDB() {
+    return _instance;
+  }
+  Sqlite? db;
+  Future<Sqlite> getDb() async {
+    if (db == null) {
+      var plugin = LibsimpleFlutter();
+      db = plugin.getSqlite('note.sqlite3');
+    }
+    await initDb(db!);
+    return db!;
+  }
+
+  Future<List<NoteModel>> getList() async {
+    var _db = await getDb();
+    var rows = await _db.query("select * from note order by updated_at desc");
+    List<NoteModel> notes = [];
+    for (var row in rows) {
+      var content = jsonDecode(row['content']);
+      var createdAt = DateTime.fromMillisecondsSinceEpoch(row['created_at']);
+      var updatedAt = DateTime.fromMillisecondsSinceEpoch(row['updated_at']);
+      var note = NoteModel(
+          id: row['id'],
+          content: content,
+          createdAt: createdAt.toString(),
+          updatedAt: updatedAt.toString());
+      notes.add(note);
+    }
+    return notes;
+  }
+
+  Future<void> save(NoteModel note) async {
+    var _db = await getDb();
+    var content = jsonEncode(note.content);
+    var createdAt = note.createdAt?.millisecondsSinceEpoch;
+    var updatedAt = note.updatedAt?.millisecondsSinceEpoch;
+    var sql = '''
+    insert or replace into note(id,content,created_at,updated_at,status)
+    values('${note.id}','$content',$createdAt,$updatedAt,1);
+''';
+    _db.exec(sql);
+    sql = ''' delete from note_search where note_id='${note.id}' ''';
+    _db.exec(sql);
+    sql = ''' insert into note_search values('${note.id}','$content') ''';
+    _db.exec(sql);
+  }
+
+  Future<void> clear() async {
+    var _db = await getDb();
+    await _db.exec("drop table note");
+    await _db.exec("drop table note_search");
+    dbInited = false;
+  }
+
+  Future<DateTime> getLastUpdatedAt() async {
+    var _db = await getDb();
+    var rows = await _db
+        .query("select updated_at from note order by updated_at desc limit 1");
+    if (rows.isNotEmpty) {
+      var ts = rows[0]['updated_at'];
+      return DateTime.fromMillisecondsSinceEpoch(ts);
+    } else {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+  }
+
+  var dbInited = false;
+  initDb(Sqlite _db) async {
+    if (dbInited) {
+      return;
+    }
+    await _db.exec('''
+    create table if not exists note(
+      id text primary key,
+      content text,
+      created_at int,
+      updated_at int,
+      status int -- 1 means normal,-1 means in trush,
+    )
+    ''');
+    await _db.exec('''
+    create virtual table if not exists note_search using fts5(
+      note_id,
+      content,
+      tokenize='simple'
+    )
+    ''');
+    dbInited = true;
   }
 }
