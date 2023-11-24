@@ -17,6 +17,7 @@ import 'util.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:logger/logger.dart';
 import 'service.dart';
+import 'package:easy_debounce/easy_debounce.dart';
 
 var logger = Logger();
 
@@ -166,6 +167,11 @@ class _BottomAppBar extends StatelessWidget {
                 Scaffold.of(context).openDrawer();
               },
             ),
+            IconButton(
+                onPressed: () {
+                  showSearch(context: context, delegate: NoteSearch());
+                },
+                icon: const Icon(Icons.search))
           ],
         ),
       ),
@@ -253,12 +259,18 @@ class NoteThumb extends StatelessWidget {
 }
 
 class NoteCards extends StatelessWidget {
-  const NoteCards({super.key});
+  final List<NoteModel>? searchResult;
+  const NoteCards({super.key, this.searchResult});
 
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<SNoteAppState>();
-    var noteList = appState.noteList;
+    List<NoteModel> noteList;
+    if (searchResult != null) {
+      noteList = searchResult!;
+    } else {
+      noteList = appState.noteList;
+    }
     return RefreshIndicator(
         onRefresh: () async {
           await appState.fetchNotes(refresh: true);
@@ -317,10 +329,10 @@ class NoteEditor extends StatelessWidget {
     textController.moveCursorToEnd();
 
     Function? addImage;
-    var imageBtn = quill.QuillCustomButton(
-      iconData: const IconData(0xe332, fontFamily: 'MaterialIcons'),
+    var imageBtn = quill.QuillToolbarCustomButtonOptions(
+      icon: const Icon(Icons.image),
       tooltip: 'upload image',
-      onTap: () async {
+      onPressed: () async {
         var result = await FilePicker.platform.pickFiles(
             type: FileType.image, allowMultiple: false, withData: true);
         var imageBytes = result?.files.single.bytes;
@@ -582,5 +594,75 @@ class KeyExchangeCodePop extends StatelessWidget {
       const Text(
           'One of your client are requiring the important encryption key\nWhen this code typed means authorize that client to decode your notes')
     ]));
+  }
+}
+
+class NoteSearch extends SearchDelegate {
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+          // When pressed here the query will be cleared from the search bar.
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        Navigator.of(context).pop();
+      },
+    );
+  }
+
+  final String debouncerId = 'search-debouncer';
+  @override
+  Widget buildResults(BuildContext context) {
+    var appState = context.watch<SNoteAppState>();
+    EasyDebounce.cancel(debouncerId);
+    var result = appState.searchNotes(query);
+    return showFutureResult(result);
+  }
+
+  FutureBuilder showFutureResult(Future<dynamic>? result) {
+    return FutureBuilder(
+        future: result,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done &&
+              snapshot.hasData) {
+            return NoteCards(searchResult: snapshot.data);
+          } else {
+            /* 
+            I want keep showing previous result while user typing, but at here it will fire every time user typed a single letter
+            I know it will not re-render if the app state not changed.but I am not sure if there has other costs.
+            so I keep showing blank while user typing.
+            */
+            return const SizedBox.shrink();
+          }
+        });
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    var appState = context.watch<SNoteAppState>();
+    Completer _completer = Completer();
+
+    EasyDebounce.debounce(debouncerId, const Duration(milliseconds: 500),
+        () async {
+      if (query.isEmpty) {
+        _completer.complete(<NoteModel>[]);
+        return;
+      }
+      var result = await appState.searchNotes(query);
+      _completer.complete(result);
+      // showResults(context);
+    });
+    return showFutureResult(_completer.future);
   }
 }

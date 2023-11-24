@@ -241,6 +241,14 @@ class SNoteAppState extends ChangeNotifier {
   void verifyAesExchangeCode(String code) {
     noteService.verifyAesExchangeCode(code);
   }
+
+  Future<List<NoteModel>> searchNotes(String query) async {
+    var db = NoteDB();
+    List<String> ids = await db.search(query);
+    var searchResult = <NoteModel>[];
+    searchResult.addAll(noteList.where((note) => ids.contains(note.id)));
+    return searchResult;
+  }
 }
 
 class HttpClient extends http.BaseClient {
@@ -550,6 +558,7 @@ class NoteDB {
   Future<void> save(NoteModel note) async {
     var _db = await getDb();
     var content = jsonEncode(note.content);
+    var searchContent = extractQuillText(note.content);
     var createdAt = note.createdAt?.millisecondsSinceEpoch;
     var updatedAt = note.updatedAt?.millisecondsSinceEpoch;
     var sql = '''
@@ -559,8 +568,21 @@ class NoteDB {
     _db.exec(sql);
     sql = ''' delete from note_search where note_id='${note.id}' ''';
     _db.exec(sql);
-    sql = ''' insert into note_search values('${note.id}','$content') ''';
+    sql = ''' insert into note_search values('${note.id}','$searchContent') ''';
     _db.exec(sql);
+  }
+
+  String extractQuillText(List content) {
+    var fullText = '';
+    for (var c in content) {
+      if (c['type'] != 'quill') {
+        continue;
+      }
+      for (var textList in c['value'] as List) {
+        fullText += " ${textList.values.join(' ')}";
+      }
+    }
+    return fullText;
   }
 
   Future<void> clear() async {
@@ -580,6 +602,17 @@ class NoteDB {
     } else {
       return DateTime.fromMillisecondsSinceEpoch(0);
     }
+  }
+
+  Future<List<String>> search(String query) async {
+    var _db = await getDb();
+    var rows = await _db.query(
+        "select note_id from note_search where content match simple_query('$query')");
+    List<String> ids = [];
+    for (var row in rows) {
+      ids.add(row['note_id']);
+    }
+    return ids;
   }
 
   var dbInited = false;
