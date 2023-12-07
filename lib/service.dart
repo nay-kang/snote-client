@@ -561,15 +561,13 @@ class NoteDB {
     var searchContent = extractQuillText(note.content);
     var createdAt = note.createdAt?.millisecondsSinceEpoch;
     var updatedAt = note.updatedAt?.millisecondsSinceEpoch;
-    var sql = '''
-    insert or replace into note(id,content,created_at,updated_at,status)
-    values('${note.id}','$content',$createdAt,$updatedAt,1);
-''';
-    _db.exec(sql);
-    sql = ''' delete from note_search where note_id='${note.id}' ''';
-    _db.exec(sql);
-    sql = ''' insert into note_search values('${note.id}','$searchContent') ''';
-    _db.exec(sql);
+    var sql =
+        "insert or replace into note(id,content,created_at,updated_at,status) values(?,?,?,?,1);";
+    _db.exec(sql, [note.id, content, createdAt, updatedAt]);
+    sql = " delete from note_search where note_id=? ";
+    _db.exec(sql, [note.id]);
+    sql = " insert into note_search values(?,?) ";
+    _db.exec(sql, [note.id, searchContent]);
   }
 
   String extractQuillText(List content) {
@@ -607,7 +605,8 @@ class NoteDB {
   Future<List<String>> search(String query) async {
     var _db = await getDb();
     var rows = await _db.query(
-        "select note_id from note_search where content match simple_query('$query')");
+        "select note_id from note_search where content match simple_query(?)",
+        [query]);
     List<String> ids = [];
     for (var row in rows) {
       ids.add(row['note_id']);

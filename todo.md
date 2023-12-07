@@ -10,3 +10,4 @@ add logout, mainly for debug {cm:2023-06-19}
 save notes at local {cm:2023-11-16}
 do not update if note content remain unchange
 device will receive grpc update notify even the modify is made by the device-self
+add recycle-box
