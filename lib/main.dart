@@ -103,6 +103,19 @@ class SNoteMain extends StatelessWidget {
     });
     appState.checkAesKey();
 
+    return ChangeNotifierProvider<SNoteAppState>.value(
+      value: appState,
+      child: const SNoteHome(),
+    );
+  }
+}
+
+class SNoteHome extends StatelessWidget {
+  const SNoteHome({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    var appState = context.watch<SNoteAppState>();
     return MaterialApp(
       theme: ThemeData(
           useMaterial3: false,
@@ -123,28 +136,85 @@ class SNoteMain extends StatelessWidget {
           ),
           floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
           bottomNavigationBar: const _BottomAppBar(),
-          drawer: Drawer(
-              child: ListView(
-            children: [
-              const DrawerHeader(child: Text('Profile')),
-              ListTile(
-                title: const Text('devices'),
-                onTap: () {
-                  Navigator.pop(context);
-                  logger.d('devices button tapped');
-                },
-              ),
-              ListTile(
-                title: const Text('logout'),
-                onTap: () {
-                  FirebaseAuth.instance.signOut();
-                },
-              )
-            ],
-          )),
+          drawer: const MainDrawer(),
         ),
       ),
     );
+  }
+}
+
+class SNoteTrash extends StatelessWidget {
+  const SNoteTrash({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      theme: ThemeData(
+          useMaterial3: false,
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.white)),
+      home: Builder(
+        builder: (context) => const Scaffold(
+          body: NoteCards(
+            listType: ListType.trash,
+          ),
+          bottomNavigationBar: _BottomAppBar(),
+          drawer: MainDrawer(),
+        ),
+      ),
+    );
+  }
+}
+
+class MainDrawer extends StatelessWidget {
+  const MainDrawer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    var appState = context.watch<SNoteAppState>();
+    return Drawer(
+        child: ListView(
+      children: [
+        const DrawerHeader(child: Text('Profile')),
+        ListTile(
+          leading: const Icon(Icons.home),
+          title: const Text('Home'),
+          onTap: () {
+            Navigator.of(context).pushReplacement(MaterialPageRoute(
+                builder: (context) =>
+                    ChangeNotifierProvider<SNoteAppState>.value(
+                      value: appState,
+                      child: const SNoteHome(),
+                    )));
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.devices),
+          title: const Text('devices'),
+          onTap: () {
+            logger.d('devices button tapped');
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.delete),
+          title: const Text('Trash'),
+          onTap: () {
+            Navigator.of(context).pushReplacement(MaterialPageRoute(
+                builder: (context) =>
+                    ChangeNotifierProvider<SNoteAppState>.value(
+                      value: appState,
+                      child: const SNoteTrash(),
+                    )));
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.logout),
+          title: const Text('Sign Out'),
+          onTap: () {
+            FirebaseAuth.instance.signOut();
+          },
+        )
+      ],
+    ));
   }
 }
 
@@ -258,9 +328,13 @@ class NoteThumb extends StatelessWidget {
   }
 }
 
+enum ListType { normal, trash }
+
 class NoteCards extends StatelessWidget {
   final List<NoteModel>? searchResult;
-  const NoteCards({super.key, this.searchResult});
+  final ListType listType;
+  const NoteCards(
+      {super.key, this.searchResult, this.listType = ListType.normal});
 
   @override
   Widget build(BuildContext context) {
@@ -268,8 +342,10 @@ class NoteCards extends StatelessWidget {
     List<NoteModel> noteList;
     if (searchResult != null) {
       noteList = searchResult!;
+    } else if (listType == ListType.trash) {
+      noteList = appState.trashNotes;
     } else {
-      noteList = appState.noteList;
+      noteList = appState.normalNotes;
     }
     return RefreshIndicator(
         onRefresh: () async {

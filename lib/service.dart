@@ -19,7 +19,8 @@ import 'package:libsimple_flutter/libsimple_flutter.dart';
 var logger = Logger();
 
 class SNoteAppState extends ChangeNotifier {
-  List<NoteModel> noteList = [];
+  List<NoteModel> normalNotes = [];
+  List<NoteModel> trashNotes = [];
   String? token;
   late NoteService noteService;
   User? firebaseUser;
@@ -119,10 +120,10 @@ class SNoteAppState extends ChangeNotifier {
 
   Future<void> _noteUpdatedCallback(String eventAt) async {
     var date = DateTime.parse(eventAt);
-    if (noteList.isNotEmpty &&
+    if (normalNotes.isNotEmpty &&
         // if updatedAt is null means this is newly created note
-        noteList[0].updatedAt != null &&
-        noteList[0].updatedAt!.compareTo(date) < 0) {
+        normalNotes[0].updatedAt != null &&
+        normalNotes[0].updatedAt!.compareTo(date) < 0) {
       fetchNotes();
     }
   }
@@ -172,31 +173,58 @@ class SNoteAppState extends ChangeNotifier {
     if (refresh) {
       await db.clear();
     }
+
     var localNotes = await db.getList();
-    noteList.clear();
-    noteList.addAll(localNotes);
+    var seperatedNotes = trashNoteSeperate(localNotes);
+    normalNotes.clear();
+    normalNotes.addAll(seperatedNotes['normalNotes']!);
+    trashNotes.clear();
+    trashNotes.addAll(seperatedNotes['trashNotes']!);
     // display local notes immediately
     if (refresh == false) {
       notifyListeners();
     }
     var lastTimestamp = await db.getLastUpdatedAt();
     var remoteNotes = await noteService.loadNotesHttp(lastTimestamp);
-    mergeNotes(localNotes, remoteNotes);
+    var mergedNotes = updateLocalNotes(localNotes, remoteNotes);
+    seperatedNotes = trashNoteSeperate(mergedNotes);
+    normalNotes.clear();
+    normalNotes.addAll(seperatedNotes['normalNotes']!);
+    trashNotes.clear();
+    trashNotes.addAll(seperatedNotes['trashNotes']!);
+    notifyListeners();
   }
 
-  mergeNotes(List<NoteModel> local, List<NoteModel> remote) {
+  Map<String, List<NoteModel>> trashNoteSeperate(List<NoteModel> notes) {
+    List<NoteModel> nNotes = [];
+    List<NoteModel> tNotes = [];
+    for (var note in notes) {
+      if (note.status == NoteStatus.normal) {
+        nNotes.add(note);
+      } else {
+        tNotes.add(note);
+      }
+    }
+    return {'normalNotes': nNotes, 'trashNotes': tNotes};
+  }
+
+  List<NoteModel> updateLocalNotes(
+      List<NoteModel> local, List<NoteModel> remote) {
     var db = NoteDB();
     for (var note in remote.reversed) {
-      db.save(note);
+      if (note.status == NoteStatus.hardDelete) {
+        db.delete(note.id);
+      } else {
+        db.save(note);
+      }
       int index = local.indexWhere((element) => element.id == note.id);
       if (index > -1) {
         local.removeAt(index);
       }
     }
-    local = remote + local;
-    noteList.clear();
-    noteList.addAll(local);
-    notifyListeners();
+    remote =
+        remote.where((note) => note.status != NoteStatus.hardDelete).toList();
+    return remote + local;
   }
 
   void prepareKeyExchange() {
@@ -204,15 +232,18 @@ class SNoteAppState extends ChangeNotifier {
   }
 
   List<dynamic> getById(String id) {
-    return noteList.firstWhere((element) => element.id == id).content;
+    return normalNotes.firstWhere((element) => element.id == id).content;
   }
 
   void updateContent(String id, List<dynamic> content) {
-    var note = noteList.firstWhere((element) => element.id == id);
+    var note = normalNotes.firstWhere((element) => element.id == id);
+    if (note.content == content) {
+      return;
+    }
     note.content = content;
     noteService.updateNote(id, content).then((value) {
-      noteList.remove(note);
-      noteList.insert(0, value);
+      normalNotes.remove(note);
+      normalNotes.insert(0, value);
       notifyListeners();
       var db = NoteDB();
       db.save(value);
@@ -222,14 +253,13 @@ class SNoteAppState extends ChangeNotifier {
 
   NoteModel createNote() {
     var note = NoteModel();
-    noteList.insert(0, note);
+    normalNotes.insert(0, note);
 
     return note;
   }
 
   Future<void> deleteNote(NoteModel note) async {
     await noteService.deleteNote(note.id);
-    noteList.remove(note);
     notifyListeners();
   }
 
@@ -246,7 +276,7 @@ class SNoteAppState extends ChangeNotifier {
     var db = NoteDB();
     List<String> ids = await db.search(query);
     var searchResult = <NoteModel>[];
-    searchResult.addAll(noteList.where((note) => ids.contains(note.id)));
+    searchResult.addAll(normalNotes.where((note) => ids.contains(note.id)));
     return searchResult;
   }
 }
@@ -403,7 +433,8 @@ class NoteService {
           id: n['id'],
           content: jsonDecode(plaintext),
           createdAt: n['created_at'],
-          updatedAt: n['updated_at']);
+          updatedAt: n['updated_at'],
+          status: NoteStatus.getByValue(n['status']));
       return note;
     }).toList();
     var notes = await Future.wait(notesFutures);
@@ -488,11 +519,25 @@ class NoteService {
   }
 }
 
+enum NoteStatus {
+  normal(1),
+  softDelete(-1),
+  hardDelete(-2);
+
+  const NoteStatus(this.value);
+  final num value;
+
+  static NoteStatus getByValue(num i) {
+    return NoteStatus.values.firstWhere((x) => x.value == i);
+  }
+}
+
 class NoteModel {
   late String id;
   late List<dynamic> content;
   DateTime? createdAt;
   DateTime? updatedAt;
+  NoteStatus status;
 
   static const uuid = Uuid();
 
@@ -500,7 +545,8 @@ class NoteModel {
       {String? id,
       List<dynamic>? content,
       String? createdAt,
-      String? updatedAt}) {
+      String? updatedAt,
+      this.status = NoteStatus.normal}) {
     id ??= uuid.v4();
     this.id = id;
     if (content == null) {
@@ -549,7 +595,8 @@ class NoteDB {
           id: row['id'],
           content: content,
           createdAt: createdAt.toString(),
-          updatedAt: updatedAt.toString());
+          updatedAt: updatedAt.toString(),
+          status: NoteStatus.getByValue(row['status']));
       notes.add(note);
     }
     return notes;
@@ -562,12 +609,19 @@ class NoteDB {
     var createdAt = note.createdAt?.millisecondsSinceEpoch;
     var updatedAt = note.updatedAt?.millisecondsSinceEpoch;
     var sql =
-        "insert or replace into note(id,content,created_at,updated_at,status) values(?,?,?,?,1);";
-    _db.exec(sql, [note.id, content, createdAt, updatedAt]);
+        "insert or replace into note(id,content,created_at,updated_at,status) values(?,?,?,?,?);";
+    await _db
+        .exec(sql, [note.id, content, createdAt, updatedAt, note.status.value]);
     sql = " delete from note_search where note_id=? ";
-    _db.exec(sql, [note.id]);
+    await _db.exec(sql, [note.id]);
     sql = " insert into note_search values(?,?) ";
-    _db.exec(sql, [note.id, searchContent]);
+    await _db.exec(sql, [note.id, searchContent]);
+  }
+
+  Future<void> delete(String noteId) async {
+    var _db = await getDb();
+    await _db.exec('delete from note where id=?', [noteId]);
+    await _db.exec('delete from note_search where note_id=?', [noteId]);
   }
 
   String extractQuillText(List content) {

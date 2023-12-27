@@ -93,3 +93,29 @@ but wait,because the content are in many forms,I already encode it to JSON,so I 
 2023-11-02
 get stucked at "Cross-Origin-Embedder-Policy".the jsdelivr do not support add this header,the flutter local dev server would not support either.and I after switch to https server and add headers, it also need me to run in worker.I test that with sqlite offical demo-123-worker.and I had to change oo1.DB to oo1.OpfsDb().
 next I had to figure out how to make worker postMessage works like function call the could return query result.
+
+2023-12-22
+dart really sucks on something.like I can run this list destructure code in `DartPad`
+```dart
+void main() {
+  var a = [1,2,3];
+  var [b,...c] = a;
+  print(b);
+}
+```
+but I can not run it in my project.
+another is enum.I can define a enum with custom value.but I can not direct using it. I had to define a method to map a custom int value to enum
+```dart
+enum NoteStatus {
+  normal(1),
+  softDelete(-1),
+  hardDelete(-2);
+
+  const NoteStatus(this.value);
+  final num value;
+
+  static NoteStatus getByValue(num i) {
+    return NoteStatus.values.firstWhere((x) => x.value == i);
+  }
+}
+```

@@ -5,9 +5,10 @@ input chinese lag,first a box after a few seconds it become the real word
 websocket keepalive {cm:2023-06-16}
 android user-agent null {cm:2023-06-16}
 add delete-able {cm:2023-06-19}
-add **undo** after delete
+add **undo** after delete - if I have trash,than this will be not necessary {cm:2023-12-27}
 add logout, mainly for debug {cm:2023-06-19}
 save notes at local {cm:2023-11-16}
-do not update if note content remain unchange
+do not update if note content remain unchange {cm:2023-12-27}
 device will receive grpc update notify even the modify is made by the device-self
-add recycle-box
+add recycle-box {cm:2023-12-27}
+add ability of restore note from trash.eg: restore button or after edit content.
