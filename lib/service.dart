@@ -235,20 +235,17 @@ class SNoteAppState extends ChangeNotifier {
     return normalNotes.firstWhere((element) => element.id == id).content;
   }
 
-  void updateContent(String id, List<dynamic> content) {
-    var note = normalNotes.firstWhere((element) => element.id == id);
-    if (note.content == content) {
+  /**
+   * updateContent also make note from delete status to normal status
+   */
+  Future<void> updateContent(String id, List<dynamic> content) async {
+    var allNotes = normalNotes + trashNotes;
+    var note = allNotes.firstWhere((element) => element.id == id);
+    if (note.content == content && note.status == NoteStatus.normal) {
       return;
     }
     note.content = content;
-    noteService.updateNote(id, content).then((value) {
-      normalNotes.remove(note);
-      normalNotes.insert(0, value);
-      notifyListeners();
-      var db = NoteDB();
-      db.save(value);
-    });
-    notifyListeners();
+    await noteService.updateNote(id, content);
   }
 
   NoteModel createNote() {

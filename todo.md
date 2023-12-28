@@ -11,4 +11,4 @@ save notes at local {cm:2023-11-16}
 do not update if note content remain unchange {cm:2023-12-27}
 device will receive grpc update notify even the modify is made by the device-self
 add recycle-box {cm:2023-12-27}
-add ability of restore note from trash.eg: restore button or after edit content.
+add ability of restore note from trash.eg: restore button or after edit content. {cm:2023-12-28}

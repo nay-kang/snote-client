@@ -153,9 +153,20 @@ class SNoteTrash extends StatelessWidget {
           useMaterial3: false,
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.white)),
       home: Builder(
-        builder: (context) => const Scaffold(
-          body: NoteCards(
-            listType: ListType.trash,
+        builder: (context) => Scaffold(
+          body: SafeArea(
+            child: Column(
+              children: [
+                Container(
+                  child: Text('Notes in trash will auto delete after 30 days'),
+                  padding: EdgeInsets.all(8),
+                ),
+                Expanded(
+                    child: NoteCards(
+                  listType: ListType.trash,
+                )),
+              ],
+            ),
           ),
           bottomNavigationBar: _BottomAppBar(),
           drawer: MainDrawer(),
@@ -369,16 +380,29 @@ class NoteEditor extends StatelessWidget {
   Widget generatePopupMenu(
       SNoteAppState state, NoteModel note, BuildContext context) {
     return PopupMenuButton(itemBuilder: (context) {
-      return <PopupMenuEntry<dynamic>>[
-        PopupMenuItem(
-          child: const Text('Delete'),
-          onTap: () {
-            state.deleteNote(note).then((_) {
-              Navigator.pop(context);
-            });
-          },
-        ),
-      ];
+      var delBtn = PopupMenuItem(
+        child: const Text('Delete'),
+        onTap: () {
+          state.deleteNote(note).then((_) {
+            Navigator.pop(context);
+          });
+        },
+      );
+      var restoreBtn = PopupMenuItem(
+        child: const Text('Restore'),
+        onTap: () {
+          state.updateContent(note.id, note.content).then((_) {
+            Navigator.pop(context);
+          });
+        },
+      );
+      List<PopupMenuEntry<dynamic>> btns = [];
+      if (note.status == NoteStatus.normal) {
+        btns.addAll([delBtn]);
+      } else if (note.status == NoteStatus.softDelete) {
+        btns.addAll([restoreBtn]);
+      }
+      return btns;
     });
   }
 
@@ -430,8 +454,9 @@ class NoteEditor extends StatelessWidget {
             for (var img in imageData) {
               content.add({"type": 'image', "value": base64.encode(img)});
             }
-            appState.updateContent(note.id, content);
-            Navigator.pop(context);
+            appState.updateContent(note.id, content).then((_) {
+              Navigator.pop(context);
+            });
           },
         ),
       ),
