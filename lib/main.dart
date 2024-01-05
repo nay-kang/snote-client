@@ -42,11 +42,62 @@ class AuthGate extends StatelessWidget {
               providers: authProviders,
             );
           }
+          appState.onLoadingFuture.future.then((stream) {
+            stream.listen((event) {
+              if (event) {
+                GlobalLoadingIndicatorWidget().show(context);
+              } else {
+                GlobalLoadingIndicatorWidget().hide();
+              }
+            });
+          });
           return ChangeNotifierProvider(
             create: (context) => appState,
             child: const SNoteMain(),
           );
         });
+  }
+}
+
+class GlobalLoadingIndicatorWidget {
+  static final GlobalLoadingIndicatorWidget _instance =
+      GlobalLoadingIndicatorWidget._internal();
+
+  factory GlobalLoadingIndicatorWidget() {
+    return _instance;
+  }
+
+  GlobalLoadingIndicatorWidget._internal();
+
+  late OverlayEntry _overlayEntry;
+
+  //prevent concurrency show loading
+  var counter = 0;
+
+  void show(BuildContext context) {
+    counter += 1;
+    if (counter > 1) {
+      return;
+    }
+    _overlayEntry = OverlayEntry(
+      builder: (context) => const Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: LinearProgressIndicator(),
+      ),
+    );
+
+    Overlay.of(context)!.insert(_overlayEntry);
+  }
+
+  void hide() {
+    counter -= 1;
+    if (counter > 0) {
+      return;
+    }
+
+    _overlayEntry.remove();
   }
 }
 
@@ -116,6 +167,7 @@ class SNoteHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<SNoteAppState>();
+
     return MaterialApp(
       theme: ThemeData(
           useMaterial3: false,
@@ -158,18 +210,19 @@ class SNoteTrash extends StatelessWidget {
             child: Column(
               children: [
                 Container(
-                  child: Text('Notes in trash will auto delete after 30 days'),
-                  padding: EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
+                  child: const Text(
+                      'Notes in trash will auto delete after 30 days'),
                 ),
-                Expanded(
+                const Expanded(
                     child: NoteCards(
                   listType: ListType.trash,
                 )),
               ],
             ),
           ),
-          bottomNavigationBar: _BottomAppBar(),
-          drawer: MainDrawer(),
+          bottomNavigationBar: const _BottomAppBar(),
+          drawer: const MainDrawer(),
         ),
       ),
     );
@@ -185,7 +238,7 @@ class MainDrawer extends StatelessWidget {
     return Drawer(
         child: ListView(
       children: [
-        const DrawerHeader(child: Text('Profile')),
+        DrawerHeader(child: Text(appState.displayName)),
         ListTile(
           leading: const Icon(Icons.home),
           title: const Text('Home'),

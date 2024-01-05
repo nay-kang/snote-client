@@ -119,3 +119,8 @@ enum NoteStatus {
   }
 }
 ```
+
+2024-01-04
+I want show a global loading bar on top of screen when there has http request.but after google search and some ask GPT.there is no perfect answer.
+And I can not understand widgets and navigator.which means I write the loading bar in a parent widget.but when I navigator out,then the loading bar will not work.
+at last using Overlay to figure it out.

@@ -21,9 +21,11 @@ var logger = Logger();
 class SNoteAppState extends ChangeNotifier {
   List<NoteModel> normalNotes = [];
   List<NoteModel> trashNotes = [];
+  String displayName = '';
   String? token;
   late NoteService noteService;
   User? firebaseUser;
+  Completer<Stream> onLoadingFuture = Completer();
   SNoteAppState() {
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
       firebaseUser = user;
@@ -138,11 +140,24 @@ class SNoteAppState extends ChangeNotifier {
     if (token == null) {
       return;
     }
-
+    if (firebaseUser?.displayName != null) {
+      displayName = firebaseUser!.displayName!;
+    }
+    if (displayName.isEmpty && firebaseUser?.email != null) {
+      displayName = firebaseUser!.email!;
+    }
     seStorage = const FlutterSecureStorage();
 
-    noteService = NoteService(token!, _aesKeyCodeCallback!,
-        _aesKeyCodeVerifyCallback, _messageFromClient, _noteUpdatedCallback);
+    noteService = NoteService(
+      token!,
+      _aesKeyCodeCallback!,
+      _aesKeyCodeVerifyCallback,
+      _messageFromClient,
+      _noteUpdatedCallback,
+    );
+    noteService.onLoadingFuture.future.then((value) {
+      onLoadingFuture.complete(value);
+    });
     var clientId = await seStorage.read(key: 'client_id');
     if (clientId == null) {
       var uuid = const Uuid();
@@ -235,12 +250,16 @@ class SNoteAppState extends ChangeNotifier {
     return normalNotes.firstWhere((element) => element.id == id).content;
   }
 
-  /**
-   * updateContent also make note from delete status to normal status
-   */
+  /// updateContent also make note from delete status to normal status
   Future<void> updateContent(String id, List<dynamic> content) async {
     var allNotes = normalNotes + trashNotes;
     var note = allNotes.firstWhere((element) => element.id == id);
+    // user only create new content but without type anything.so delete the note
+    if (note.empty(newContent: content)) {
+      normalNotes.remove(note);
+      return;
+    }
+    // prevent trash content restore by just click back from NoteEdtor
     if (note.content == content && note.status == NoteStatus.normal) {
       return;
     }
@@ -280,6 +299,8 @@ class SNoteAppState extends ChangeNotifier {
 
 class HttpClient extends http.BaseClient {
   late final http.Client _inner;
+  final _loadingController = StreamController<bool>();
+  Stream get onLoading => _loadingController.stream;
   HttpClient._() {
     _inner = http.Client();
   }
@@ -319,7 +340,14 @@ class HttpClient extends http.BaseClient {
     if (!kIsWeb) {
       request.headers['User-Agent'] = userAgent;
     }
-    return _inner.send(request);
+    logger.d('start request ${request.url}');
+    _loadingController.add(true);
+
+    return _inner.send(request).then((response) async {
+      // logger.d('end request ${request.url}');
+      _loadingController.add(false);
+      return response;
+    });
   }
 }
 
@@ -332,12 +360,19 @@ class NoteService {
   Function aesKeyCodeVerifyCallback;
   Function messageFromClient;
   Function noteUpdatedCallback;
+  Completer<Stream> onLoadingFuture = Completer();
+  late Future<HttpClient> clientFuture;
   NoteService(
       this.token,
       this.aesKeyCodeCallback,
       this.aesKeyCodeVerifyCallback,
       this.messageFromClient,
-      this.noteUpdatedCallback);
+      this.noteUpdatedCallback) {
+    clientFuture = HttpClient.getInstance();
+    clientFuture.then((client) {
+      onLoadingFuture.complete(client.onLoading);
+    });
+  }
 
   Future<AesGcmSecretKey> getEncryptor() async {
     _encryptor ??= await AesGcmSecretKey.importRawKey(aesKey!);
@@ -362,7 +397,7 @@ class NoteService {
     String encContentStr = await _encrypt(jsonEncode(content));
     var header = getHeaders();
     var host = await getHost();
-    var client = await HttpClient.getInstance();
+    var client = await clientFuture;
     var response = await client.put(Uri.parse('$host/api/note/$id'),
         headers: header,
         body: jsonEncode({
@@ -382,7 +417,7 @@ class NoteService {
   Future<void> deleteNote(String id) async {
     var header = getHeaders();
     var host = await getHost();
-    var client = await HttpClient.getInstance();
+    var client = await clientFuture;
     var _ = await client.delete(
       Uri.parse('$host/api/note/$id'),
       headers: header,
@@ -399,7 +434,7 @@ class NoteService {
   Future<int> registClient(clientId) async {
     var host = await getHost();
     var headers = getHeaders();
-    var client = await HttpClient.getInstance();
+    var client = await clientFuture;
     var response = await client.put(
       Uri.parse('$host/api/client/$clientId'),
       headers: headers,
@@ -418,7 +453,7 @@ class NoteService {
       params += "updated_at=[$dateStr:]";
     }
     var host = await getHost();
-    var client = await HttpClient.getInstance();
+    var client = await clientFuture;
     var response =
         await client.get(Uri.parse('$host/api/note/$params'), headers: header);
     List data = jsonDecode(response.body);
@@ -538,6 +573,18 @@ class NoteModel {
 
   static const uuid = Uuid();
 
+  bool empty({List<dynamic>? newContent}) {
+    var _content = content;
+    if (newContent != null) {
+      _content = newContent;
+    }
+    if (_content.length == 1 &&
+        _content[0]['value'][0]['insert'].toString().trim().isEmpty) {
+      return true;
+    }
+    return false;
+  }
+
   NoteModel(
       {String? id,
       List<dynamic>? content,
@@ -559,6 +606,9 @@ class NoteModel {
     }
     if (updatedAt != null) {
       this.updatedAt = DateTime.parse(updatedAt);
+    } else {
+      // using updateAt indicate the note is newly created not saving
+      this.updatedAt = DateTime.fromMillisecondsSinceEpoch(0);
     }
   }
 }
