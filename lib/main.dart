@@ -84,7 +84,7 @@ class GlobalLoadingIndicatorWidget {
         top: 0,
         left: 0,
         right: 0,
-        child: LinearProgressIndicator(),
+        child: SafeArea(child: LinearProgressIndicator()),
       ),
     );
 
@@ -170,8 +170,10 @@ class SNoteHome extends StatelessWidget {
 
     return MaterialApp(
       theme: ThemeData(
-          useMaterial3: false,
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.white)),
+        useMaterial3: false,
+        brightness: Brightness.light,
+      ),
+      darkTheme: ThemeData(brightness: Brightness.dark, useMaterial3: false),
       home: Builder(
         builder: (context) => Scaffold(
           body: const NoteCards(),
@@ -202,8 +204,10 @@ class SNoteTrash extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: ThemeData(
-          useMaterial3: false,
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.white)),
+        useMaterial3: false,
+        brightness: Brightness.light,
+      ),
+      darkTheme: ThemeData(brightness: Brightness.dark, useMaterial3: false),
       home: Builder(
         builder: (context) => Scaffold(
           body: SafeArea(
@@ -333,7 +337,7 @@ class NoteThumb extends StatelessWidget {
                 quill.QuillConfigurations(controller: textController),
             child: quill.QuillEditor(
               configurations: const quill.QuillEditorConfigurations(
-                scrollable: false,
+                scrollable: true,
                 autoFocus: false,
                 readOnly: true,
                 expands: false,
@@ -352,28 +356,32 @@ class NoteThumb extends StatelessWidget {
           throw 'Not Support Datatype${d['type']}';
       }
     }
-
+    Widget medias = const SizedBox(
+      height: 0,
+      width: 0,
+    );
+    if (images.isNotEmpty) {
+      medias = Container(
+        height: 50,
+        alignment: Alignment.bottomLeft,
+        margin: const EdgeInsets.fromLTRB(0, 50, 0, 0),
+        child: ListView.builder(
+            itemCount: images.length,
+            scrollDirection: Axis.horizontal,
+            itemBuilder: (BuildContext context, int index) {
+              return Image.memory(images[index]);
+            }),
+      );
+    }
     return GestureDetector(
       child: Card(
         child: Container(
+          padding: const EdgeInsets.all(8),
           constraints: const BoxConstraints(maxHeight: 300),
           child: AbsorbPointer(
             absorbing: true,
             child: Stack(
-              children: [
-                quillWidgets!,
-                Container(
-                  height: 50,
-                  alignment: Alignment.bottomLeft,
-                  margin: const EdgeInsets.fromLTRB(0, 50, 0, 0),
-                  child: ListView.builder(
-                      itemCount: images.length,
-                      scrollDirection: Axis.horizontal,
-                      itemBuilder: (BuildContext context, int index) {
-                        return Image.memory(images[index]);
-                      }),
-                )
-              ],
+              children: [quillWidgets!, medias],
             ),
           ),
         ),
@@ -496,8 +504,13 @@ class NoteEditor extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 40,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded),
+          icon: const Icon(
+            Icons.arrow_back_ios_rounded,
+          ),
+          alignment: Alignment.centerLeft,
+          iconSize: 20,
           onPressed: () {
             List<dynamic> content = [];
             content.add({
@@ -515,9 +528,13 @@ class NoteEditor extends StatelessWidget {
       ),
       body: Column(children: [
         Expanded(
-            child: quill.QuillProvider(
-          configurations: quill.QuillConfigurations(controller: textController),
-          child: quill.QuillEditor.basic(),
+            child: Container(
+          padding: const EdgeInsets.all(8),
+          child: quill.QuillProvider(
+            configurations:
+                quill.QuillConfigurations(controller: textController),
+            child: quill.QuillEditor.basic(),
+          ),
         )),
         SizedBox(
           height: 100,
