@@ -260,7 +260,9 @@ class SNoteAppState extends ChangeNotifier {
       return;
     }
     // prevent trash content restore by just click back from NoteEdtor
-    if (note.content == content && note.status == NoteStatus.normal) {
+    // I want using native compare but it seems has performance issue too. https://github.com/dart-lang/collection/issues/263
+    if (jsonEncode(note.content) == jsonEncode(content) &&
+        note.status == NoteStatus.normal) {
       return;
     }
     note.content = content;
