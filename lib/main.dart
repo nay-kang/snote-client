@@ -536,39 +536,41 @@ class NoteEditor extends StatelessWidget {
             child: quill.QuillEditor.basic(),
           ),
         )),
-        SizedBox(
-          height: 100,
-          child: StatefulBuilder(
-            builder: (context, setState) {
-              addImage = (Uint8List imageBytes) {
-                setState(() {
-                  imageData.add(imageBytes);
-                });
-              };
-              void deleteImage(Uint8List imageBytes) {
-                setState(() {
-                  imageData.remove(imageBytes);
-                });
-              }
+        imageData.isEmpty
+            ? const SizedBox.shrink()
+            : SizedBox(
+                height: 100,
+                child: StatefulBuilder(
+                  builder: (context, setState) {
+                    addImage = (Uint8List imageBytes) {
+                      setState(() {
+                        imageData.add(imageBytes);
+                      });
+                    };
+                    void deleteImage(Uint8List imageBytes) {
+                      setState(() {
+                        imageData.remove(imageBytes);
+                      });
+                    }
 
-              return ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: imageData.length,
-                  itemBuilder: (context, index) {
-                    return GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => ImageViewer(
-                                    imageData[index], deleteImage)));
-                      },
-                      child: Image.memory(imageData[index]),
-                    );
-                  });
-            },
-          ),
-        ),
+                    return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: imageData.length,
+                        itemBuilder: (context, index) {
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) => ImageViewer(
+                                          imageData[index], deleteImage)));
+                            },
+                            child: Image.memory(imageData[index]),
+                          );
+                        });
+                  },
+                ),
+              ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
