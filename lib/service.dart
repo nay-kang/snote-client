@@ -164,10 +164,10 @@ class SNoteAppState extends ChangeNotifier {
       clientId = uuid.v4().toString();
       await seStorage.write(key: 'client_id', value: clientId);
     }
-    var clientCount = await noteService.registClient(clientId);
+    var clientCountFuture = noteService.registClient(clientId);
 
     var aesKeyBase64 = await seStorage.read(key: 'note_aes_key');
-    if (aesKeyBase64 == null && clientCount <= 1) {
+    if (aesKeyBase64 == null && await clientCountFuture <= 1) {
       var aesKey = Uint8List(32);
       fillRandomBytes(aesKey);
       aesKeyBase64 = base64.encode(aesKey);
@@ -178,7 +178,7 @@ class SNoteAppState extends ChangeNotifier {
     } else {
       mainAesKey = base64.decode(aesKeyBase64);
       noteService.setAesKey(mainAesKey!);
-      await noteService.getRpcClient();
+      noteService.getRpcClient();
       await fetchNotes();
     }
   }
