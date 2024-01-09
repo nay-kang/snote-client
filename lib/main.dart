@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -15,15 +16,23 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:math';
 import 'util.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:logger/logger.dart';
 import 'service.dart';
 import 'package:easy_debounce/easy_debounce.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
-var logger = Logger();
+var logger = Slogger();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FlutterError.onError = (errorDetails) {
+    FirebaseCrashlytics.instance.recordFlutterError(errorDetails);
+  };
+  // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
   runApp(const SNoteApp());
 }
 
@@ -260,6 +269,7 @@ class MainDrawer extends StatelessWidget {
           title: const Text('devices'),
           onTap: () {
             logger.d('devices button tapped');
+            throw Exception();
           },
         ),
         ListTile(

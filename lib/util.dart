@@ -1,3 +1,4 @@
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -6,7 +7,16 @@ import 'package:flutter/services.dart';
 import 'dart:math';
 import 'package:logger/logger.dart';
 
-var logger = Logger();
+class Slogger extends Logger {
+  @override
+  void log(Level level, message,
+      {DateTime? time, Object? error, StackTrace? stackTrace}) {
+    FirebaseCrashlytics.instance.log("$time:$level:$message");
+    super.log(level, message, time: time, error: error, stackTrace: stackTrace);
+  }
+}
+
+var logger = Slogger();
 const maxImageSize = 1024 * 1024;
 const maxResolution = 1200;
 

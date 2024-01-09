@@ -61,6 +61,8 @@ dependencies:
   js: ^0.6.7
   libsimple_flutter: ^0.0.1
   easy_debounce: ^2.0.3
+  firebase_analytics: ^10.8.0
+  firebase_crashlytics: ^3.4.9
 
 dev_dependencies:
   flutter_test:

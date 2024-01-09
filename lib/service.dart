@@ -7,16 +7,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:snote/util.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:webcrypto/webcrypto.dart';
 import 'package:http/http.dart' as http;
-import 'package:logger/logger.dart';
 import 'package:json_rpc_2/json_rpc_2.dart' as jrpc;
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:libsimple_flutter/libsimple_flutter.dart';
 
-var logger = Logger();
+var logger = Slogger();
 
 class SNoteAppState extends ChangeNotifier {
   List<NoteModel> normalNotes = [];
