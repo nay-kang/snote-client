@@ -7,9 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
-import 'package:firebase_auth/firebase_auth.dart' hide EmailAuthProvider;
-import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:snote/login_ui.dart';
+import 'package:snote/supabase_options.dart' as supa_config;
 import 'firebase_options.dart';
 import 'package:pinput/pinput.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -19,6 +19,7 @@ import 'package:photo_view/photo_view.dart';
 import 'service.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 var logger = Slogger();
 
@@ -33,6 +34,8 @@ Future<void> main() async {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };
+  await Supabase.initialize(
+      anonKey: supa_config.publicKey, url: supa_config.url);
   runApp(const SNoteApp());
 }
 
@@ -41,18 +44,18 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var authProviders = [EmailAuthProvider()];
     var appState = SNoteAppState();
     return StreamBuilder(
-        stream: FirebaseAuth.instance.authStateChanges(),
+        stream: Supabase.instance.client.auth.onAuthStateChange,
         builder: (context, authState) {
-          if (!authState.hasData) {
-            return SignInScreen(
-              providers: authProviders,
-            );
+          if (!authState.hasData || authState.data?.session == null) {
+            return const PasswordLessLogin();
           }
-          appState.onLoadingFuture.future.then((stream) {
-            stream.listen((event) {
+          appState.onLoadingFuture.future.then((streamController) {
+            if (streamController.hasListener) {
+              return;
+            }
+            streamController.stream.listen((event) {
               if (event) {
                 GlobalLoadingIndicatorWidget().show(context);
               } else {
@@ -97,7 +100,7 @@ class GlobalLoadingIndicatorWidget {
       ),
     );
 
-    Overlay.of(context)!.insert(_overlayEntry);
+    Overlay.of(context).insert(_overlayEntry);
   }
 
   void hide() {
@@ -288,7 +291,7 @@ class MainDrawer extends StatelessWidget {
           leading: const Icon(Icons.logout),
           title: const Text('Sign Out'),
           onTap: () {
-            FirebaseAuth.instance.signOut();
+            Supabase.instance.client.auth.signOut();
           },
         )
       ],

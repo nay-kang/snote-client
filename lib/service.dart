@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:snote/util.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:webcrypto/webcrypto.dart';
@@ -24,11 +24,11 @@ class SNoteAppState extends ChangeNotifier {
   String displayName = '';
   String? token;
   late NoteService noteService;
-  User? firebaseUser;
-  Completer<Stream> onLoadingFuture = Completer();
+  Session? userSession;
+  Completer<StreamController> onLoadingFuture = Completer();
   SNoteAppState() {
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
-      firebaseUser = user;
+    Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      userSession = event.session;
     });
   }
 
@@ -133,19 +133,14 @@ class SNoteAppState extends ChangeNotifier {
   Uint8List? mainAesKey;
   late FlutterSecureStorage seStorage;
   Future<void> checkAesKey() async {
-    if (firebaseUser == null) {
+    if (userSession == null) {
       return;
     }
-    token = await firebaseUser!.getIdToken();
+    token = userSession!.accessToken;
     if (token == null) {
       return;
     }
-    if (firebaseUser?.displayName != null) {
-      displayName = firebaseUser!.displayName!;
-    }
-    if (displayName.isEmpty && firebaseUser?.email != null) {
-      displayName = firebaseUser!.email!;
-    }
+    displayName = userSession!.user.email!;
     seStorage = const FlutterSecureStorage();
 
     noteService = NoteService(
@@ -155,8 +150,11 @@ class SNoteAppState extends ChangeNotifier {
       _messageFromClient,
       _noteUpdatedCallback,
     );
+
     noteService.onLoadingFuture.future.then((value) {
-      onLoadingFuture.complete(value);
+      if (onLoadingFuture.isCompleted == false) {
+        onLoadingFuture.complete(value);
+      }
     });
     var clientId = await seStorage.read(key: 'client_id');
     if (clientId == null) {
@@ -301,8 +299,7 @@ class SNoteAppState extends ChangeNotifier {
 
 class HttpClient extends http.BaseClient {
   late final http.Client _inner;
-  final _loadingController = StreamController<bool>();
-  Stream get onLoading => _loadingController.stream;
+  final onLoading = StreamController<bool>();
   HttpClient._() {
     _inner = http.Client();
   }
@@ -343,11 +340,11 @@ class HttpClient extends http.BaseClient {
       request.headers['User-Agent'] = userAgent;
     }
     logger.d('start request ${request.url}');
-    _loadingController.add(true);
+    onLoading.add(true);
 
     return _inner.send(request).then((response) async {
       // logger.d('end request ${request.url}');
-      _loadingController.add(false);
+      onLoading.add(false);
       return response;
     });
   }
@@ -362,7 +359,7 @@ class NoteService {
   Function aesKeyCodeVerifyCallback;
   Function messageFromClient;
   Function noteUpdatedCallback;
-  Completer<Stream> onLoadingFuture = Completer();
+  Completer<StreamController> onLoadingFuture = Completer();
   late Future<HttpClient> clientFuture;
   NoteService(
       this.token,

@@ -18,3 +18,7 @@ add global loading animation {cm:2024-01-05}
 auto focus on end of note
 new note not showing bug {cm:2024-01-03}
 disable empty note saving {cm:2024-01-03}
+replace firebase auth due to some country can not connect to firebase
+try to erase note aeskey when user change. be carefull user re-login
+seems supabase long time no active will cause server verify expired.not fully tested
+add loading after fill login code

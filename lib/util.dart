@@ -3,7 +3,6 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:math';
 import 'package:logger/logger.dart';
 
@@ -11,7 +10,9 @@ class Slogger extends Logger {
   @override
   void log(Level level, message,
       {DateTime? time, Object? error, StackTrace? stackTrace}) {
-    FirebaseCrashlytics.instance.log("$time:$level:$message");
+    if (!kIsWeb) {
+      FirebaseCrashlytics.instance.log("$time:$level:$message");
+    }
     super.log(level, message, time: time, error: error, stackTrace: stackTrace);
   }
 }

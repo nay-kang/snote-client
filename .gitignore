@@ -81,3 +81,6 @@ doc/api/
 # podlock
 ios/Podfile.lock
 macos/Podfile.lock
+
+# supabase
+lib/supabase_options.dart
