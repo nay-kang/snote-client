@@ -15,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'package:json_rpc_2/json_rpc_2.dart' as jrpc;
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:libsimple_flutter/libsimple_flutter.dart';
+import 'package:archive/archive.dart';
 
 var logger = Slogger();
 
@@ -128,6 +129,10 @@ class SNoteAppState extends ChangeNotifier {
         normalNotes[0].updatedAt!.compareTo(date) < 0) {
       fetchNotes();
     }
+  }
+
+  void remoteAesKey() {
+    seStorage.delete(key: 'note_aes_key');
   }
 
   Uint8List? mainAesKey;
@@ -339,7 +344,7 @@ class HttpClient extends http.BaseClient {
     if (!kIsWeb) {
       request.headers['User-Agent'] = userAgent;
     }
-    logger.d('start request ${request.url}');
+    logger.i('start request ${request.url}');
     onLoading.add(true);
 
     return _inner.send(request).then((response) async {
@@ -395,14 +400,15 @@ class NoteService {
   Future<NoteModel> updateNote(String id, List<dynamic> content) async {
     String encContentStr = await _encrypt(jsonEncode(content));
     var header = getHeaders();
+    header['Content-Encoding'] = 'gzip';
     var host = await getHost();
     var client = await clientFuture;
-    var response = await client.put(Uri.parse('$host/api/note/$id'),
-        headers: header,
-        body: jsonEncode({
-          'content': encContentStr,
-        }));
 
+    var compressBody = GZipEncoder().encode(jsonEncode({
+      'content': encContentStr,
+    }).codeUnits);
+    var response = await client.put(Uri.parse('$host/api/note/$id'),
+        headers: header, body: compressBody);
     Map<String, dynamic> data = jsonDecode(response.body);
     var decContent = await _decrypt(data['content']);
     var note = NoteModel(

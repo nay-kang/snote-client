@@ -39,10 +39,7 @@ dependencies:
   flutter_staggered_grid_view: ^0.7.0
   flutter_quill: ^8.6.0
   uuid: ^4.0.0
-  encrypt: ^5.0.0
   localstorage: ^4.0.0+1
-  firebase_auth: ^4.2.2
-  firebase_ui_auth: ^1.1.17
   firebase_core: ^2.8.0
   http: ^1.1.0
   flutter_secure_storage: ^9.0.0
@@ -64,6 +61,7 @@ dependencies:
   firebase_analytics: ^10.8.0
   firebase_crashlytics: ^3.4.9
   supabase_flutter: ^2.2.0
+  archive: ^3.4.10
 
 dev_dependencies:
   flutter_test:
@@ -119,7 +117,7 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
 
-fonts:
-  - family: SocialIcons
-    fonts:
-      - asset: packages/firebase_ui_auth/fonts/SocialIcons.ttf
+  fonts:
+    - family: MyNotoSansSC
+      fonts: 
+        - asset: fonts/NotoSansSC-Regular.woff

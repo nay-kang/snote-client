@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -12,7 +11,6 @@ import 'package:snote/login_ui.dart';
 import 'package:snote/supabase_options.dart' as supa_config;
 import 'firebase_options.dart';
 import 'package:pinput/pinput.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'dart:math';
 import 'util.dart';
 import 'package:photo_view/photo_view.dart';
@@ -37,38 +35,6 @@ Future<void> main() async {
   await Supabase.initialize(
       anonKey: supa_config.publicKey, url: supa_config.url);
   runApp(const SNoteApp());
-}
-
-class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    var appState = SNoteAppState();
-    return StreamBuilder(
-        stream: Supabase.instance.client.auth.onAuthStateChange,
-        builder: (context, authState) {
-          if (!authState.hasData || authState.data?.session == null) {
-            return const PasswordLessLogin();
-          }
-          appState.onLoadingFuture.future.then((streamController) {
-            if (streamController.hasListener) {
-              return;
-            }
-            streamController.stream.listen((event) {
-              if (event) {
-                GlobalLoadingIndicatorWidget().show(context);
-              } else {
-                GlobalLoadingIndicatorWidget().hide();
-              }
-            });
-          });
-          return ChangeNotifierProvider(
-            create: (context) => appState,
-            child: const SNoteMain(),
-          );
-        });
-  }
 }
 
 class GlobalLoadingIndicatorWidget {
@@ -118,9 +84,49 @@ class SNoteApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      theme: ThemeData(
+          useMaterial3: false,
+          brightness: Brightness.light,
+          fontFamily: 'MyNotoSansSC'),
+      darkTheme: ThemeData(
+          brightness: Brightness.dark,
+          useMaterial3: false,
+          fontFamily: 'MyNotoSansSC'),
       home: AuthGate(),
     );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  AuthGate({super.key});
+  final appState = SNoteAppState();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder(
+        stream: Supabase.instance.client.auth.onAuthStateChange,
+        builder: (context, authState) {
+          if (!authState.hasData || authState.data?.session == null) {
+            return const PasswordLessLogin();
+          }
+          appState.onLoadingFuture.future.then((streamController) {
+            if (streamController.hasListener) {
+              return;
+            }
+            streamController.stream.listen((event) {
+              if (event) {
+                GlobalLoadingIndicatorWidget().show(context);
+              } else {
+                GlobalLoadingIndicatorWidget().hide();
+              }
+            });
+          });
+          return ChangeNotifierProvider(
+            create: (context) => appState,
+            child: const SNoteMain(),
+          );
+        });
   }
 }
 
@@ -166,10 +172,7 @@ class SNoteMain extends StatelessWidget {
     });
     appState.checkAesKey();
 
-    return ChangeNotifierProvider<SNoteAppState>.value(
-      value: appState,
-      child: const SNoteHome(),
-    );
+    return const SNoteHome();
   }
 }
 
@@ -178,32 +181,28 @@ class SNoteHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var appState = context.watch<SNoteAppState>();
-
-    return MaterialApp(
-      theme: ThemeData(
-        useMaterial3: false,
-        brightness: Brightness.light,
+    var appState = Provider.of<SNoteAppState>(context, listen: false);
+    return Scaffold(
+      body: const NoteCards(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          var note = appState.createNote();
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) =>
+                      ChangeNotifierProvider<SNoteAppState>.value(
+                        value: appState,
+                        child: NoteEditor(note: note),
+                      )));
+        },
+        tooltip: 'Create',
+        child: const Icon(Icons.add),
       ),
-      darkTheme: ThemeData(brightness: Brightness.dark, useMaterial3: false),
-      home: Builder(
-        builder: (context) => Scaffold(
-          body: const NoteCards(),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              var note = appState.createNote();
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => NoteEditor(note: note)));
-            },
-            tooltip: 'Create',
-            child: const Icon(Icons.add),
-          ),
-          floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
-          bottomNavigationBar: const _BottomAppBar(),
-          drawer: const MainDrawer(),
-        ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
+      bottomNavigationBar: const _BottomAppBar(),
+      drawer: MainDrawer(
+        appState: appState,
       ),
     );
   }
@@ -214,39 +213,34 @@ class SNoteTrash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: ThemeData(
-        useMaterial3: false,
-        brightness: Brightness.light,
-      ),
-      darkTheme: ThemeData(brightness: Brightness.dark, useMaterial3: false),
-      home: Builder(
-        builder: (context) => Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  child: const Text(
-                      'Notes in trash will auto delete after 30 days'),
-                ),
-                const Expanded(
-                    child: NoteCards(
-                  listType: ListType.trash,
-                )),
-              ],
+    var appState = Provider.of<SNoteAppState>(context, listen: false);
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              child:
+                  const Text('Notes in trash will auto delete after 30 days'),
             ),
-          ),
-          bottomNavigationBar: const _BottomAppBar(),
-          drawer: const MainDrawer(),
+            const Expanded(
+                child: NoteCards(
+              listType: ListType.trash,
+            )),
+          ],
         ),
+      ),
+      bottomNavigationBar: const _BottomAppBar(),
+      drawer: MainDrawer(
+        appState: appState,
       ),
     );
   }
 }
 
 class MainDrawer extends StatelessWidget {
-  const MainDrawer({super.key});
+  final SNoteAppState appState;
+  const MainDrawer({super.key, required this.appState});
 
   @override
   Widget build(BuildContext context) {
@@ -279,7 +273,7 @@ class MainDrawer extends StatelessWidget {
           leading: const Icon(Icons.delete),
           title: const Text('Trash'),
           onTap: () {
-            Navigator.of(context).pushReplacement(MaterialPageRoute(
+            Navigator.of(context).push(MaterialPageRoute(
                 builder: (context) =>
                     ChangeNotifierProvider<SNoteAppState>.value(
                       value: appState,
@@ -291,6 +285,7 @@ class MainDrawer extends StatelessWidget {
           leading: const Icon(Icons.logout),
           title: const Text('Sign Out'),
           onTap: () {
+            appState.remoteAesKey();
             Supabase.instance.client.auth.signOut();
           },
         )
@@ -549,41 +544,39 @@ class NoteEditor extends StatelessWidget {
             child: quill.QuillEditor.basic(),
           ),
         )),
-        imageData.isEmpty
-            ? const SizedBox.shrink()
-            : SizedBox(
-                height: 100,
-                child: StatefulBuilder(
-                  builder: (context, setState) {
-                    addImage = (Uint8List imageBytes) {
-                      setState(() {
-                        imageData.add(imageBytes);
-                      });
-                    };
-                    void deleteImage(Uint8List imageBytes) {
-                      setState(() {
-                        imageData.remove(imageBytes);
-                      });
-                    }
+        //using statefulbuilder to keep text unchanged while update image change
+        StatefulBuilder(
+          builder: ((context, setState) {
+            addImage = (Uint8List imageBytes) {
+              setState(() {
+                imageData.add(imageBytes);
+              });
+            };
+            void deleteImage(Uint8List imageBytes) {
+              setState(() {
+                imageData.remove(imageBytes);
+              });
+            }
 
-                    return ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: imageData.length,
-                        itemBuilder: (context, index) {
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) => ImageViewer(
-                                          imageData[index], deleteImage)));
-                            },
-                            child: Image.memory(imageData[index]),
-                          );
-                        });
-                  },
-                ),
-              ),
+            return SizedBox(
+                height: imageData.isEmpty ? 0 : 100,
+                child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: imageData.length,
+                    itemBuilder: (context, index) {
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => ImageViewer(
+                                      imageData[index], deleteImage)));
+                        },
+                        child: Image.memory(imageData[index]),
+                      );
+                    }));
+          }),
+        ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -697,14 +690,26 @@ class KeyExchangePop extends StatelessWidget {
       Navigator.pop(context);
     });
     final textController = TextEditingController();
-    final defaultPinTheme = PinTheme(
+    const borderColor = Colors.white;
+
+    const defaultPinTheme = PinTheme(
       width: 56,
       height: 56,
-      textStyle: GoogleFonts.poppins(
-        fontSize: 22,
-        color: const Color.fromRGBO(30, 60, 87, 1),
-      ),
-      decoration: const BoxDecoration(),
+      textStyle: TextStyle(fontSize: 22, color: Colors.white),
+      decoration: BoxDecoration(),
+    );
+    final cursor = Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Container(
+          width: 56,
+          height: 3,
+          decoration: BoxDecoration(
+            color: borderColor,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ],
     );
     final preFilledWidget = Column(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -728,6 +733,7 @@ class KeyExchangePop extends StatelessWidget {
         pinAnimationType: PinAnimationType.slide,
         controller: textController,
         defaultPinTheme: defaultPinTheme,
+        cursor: cursor,
         showCursor: true,
         preFilledWidget: preFilledWidget,
         autofocus: true,
@@ -735,16 +741,19 @@ class KeyExchangePop extends StatelessWidget {
           appState.verifyAesExchangeCode(value);
         },
       ),
-      const SizedBox(
-        height: 44,
+      const Padding(
+        padding: EdgeInsets.fromLTRB(0, 10, 0, 10),
+        child: Text('Please open your other client to generate code'),
       ),
-      const Text('Please open your other client to generate code'),
-      ElevatedButton.icon(
-          onPressed: () {
-            appState.prepareKeyExchange();
-          },
-          icon: const Icon(Icons.refresh),
-          label: const Text('Try Again')),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+        child: ElevatedButton.icon(
+            onPressed: () {
+              appState.prepareKeyExchange();
+            },
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try Again')),
+      ),
     ]));
   }
 }
