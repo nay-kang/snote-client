@@ -23,13 +23,16 @@ class SNoteAppState extends ChangeNotifier {
   List<NoteModel> normalNotes = [];
   List<NoteModel> trashNotes = [];
   String displayName = '';
-  String? token;
+  StreamController<String> tokenStream = StreamController();
   late NoteService noteService;
   Session? userSession;
   Completer<StreamController> onLoadingFuture = Completer();
   SNoteAppState() {
     Supabase.instance.client.auth.onAuthStateChange.listen((event) {
       userSession = event.session;
+      if (userSession != null && userSession?.isExpired == false) {
+        tokenStream.add(userSession!.accessToken);
+      }
     });
   }
 
@@ -141,15 +144,11 @@ class SNoteAppState extends ChangeNotifier {
     if (userSession == null) {
       return;
     }
-    token = userSession!.accessToken;
-    if (token == null) {
-      return;
-    }
     displayName = userSession!.user.email!;
     seStorage = const FlutterSecureStorage();
 
     noteService = NoteService(
-      token!,
+      tokenStream,
       _aesKeyCodeCallback!,
       _aesKeyCodeVerifyCallback,
       _messageFromClient,
@@ -357,7 +356,7 @@ class HttpClient extends http.BaseClient {
 
 class NoteService {
   AesGcmSecretKey? _encryptor;
-  late String token;
+  StreamController<String> tokenStream;
   Uint8List? aesKey;
   String? host;
   Function aesKeyCodeCallback;
@@ -366,8 +365,10 @@ class NoteService {
   Function noteUpdatedCallback;
   Completer<StreamController> onLoadingFuture = Completer();
   late Future<HttpClient> clientFuture;
+  Completer<bool> tokenFuture = Completer();
+  String token = '';
   NoteService(
-      this.token,
+      this.tokenStream,
       this.aesKeyCodeCallback,
       this.aesKeyCodeVerifyCallback,
       this.messageFromClient,
@@ -375,6 +376,10 @@ class NoteService {
     clientFuture = HttpClient.getInstance();
     clientFuture.then((client) {
       onLoadingFuture.complete(client.onLoading);
+    });
+    tokenStream.stream.listen((event) {
+      tokenFuture.complete(true);
+      token = event;
     });
   }
 
@@ -399,7 +404,7 @@ class NoteService {
 
   Future<NoteModel> updateNote(String id, List<dynamic> content) async {
     String encContentStr = await _encrypt(jsonEncode(content));
-    var header = getHeaders();
+    var header = await getHeaders();
     header['Content-Encoding'] = 'gzip';
     var host = await getHost();
     var client = await clientFuture;
@@ -420,7 +425,7 @@ class NoteService {
   }
 
   Future<void> deleteNote(String id) async {
-    var header = getHeaders();
+    var header = await getHeaders();
     var host = await getHost();
     var client = await clientFuture;
     var _ = await client.delete(
@@ -429,7 +434,8 @@ class NoteService {
     );
   }
 
-  Map<String, String> getHeaders() {
+  Future<Map<String, String>> getHeaders() async {
+    await tokenFuture.future;
     return {
       HttpHeaders.authorizationHeader: 'Bearer $token',
       'Content-Type': 'application/json; charset=UTF-8',
@@ -438,7 +444,7 @@ class NoteService {
 
   Future<int> registClient(clientId) async {
     var host = await getHost();
-    var headers = getHeaders();
+    var headers = await getHeaders();
     var client = await clientFuture;
     var response = await client.put(
       Uri.parse('$host/api/client/$clientId'),
@@ -449,9 +455,7 @@ class NoteService {
   }
 
   Future<List<NoteModel>> loadNotesHttp([DateTime? updatedAt]) async {
-    var header = {
-      HttpHeaders.authorizationHeader: 'Bearer $token',
-    };
+    var header = await getHeaders();
     String params = "?";
     if (updatedAt != null) {
       var dateStr = updatedAt.toUtc().toIso8601String();
@@ -516,6 +520,7 @@ class NoteService {
         },
       );
       unawaited(rpcClient!.listen());
+      await tokenFuture.future;
       var _ = await rpcClient!.sendRequest('auth', {'token': token});
 
       rpcClient!.registerMethod('aeskeyCodeGenerate', (jrpc.Parameters params) {
