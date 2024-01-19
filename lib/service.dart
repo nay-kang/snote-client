@@ -378,7 +378,9 @@ class NoteService {
       onLoadingFuture.complete(client.onLoading);
     });
     tokenStream.stream.listen((event) {
-      tokenFuture.complete(true);
+      if (!tokenFuture.isCompleted) {
+        tokenFuture.complete(true);
+      }
       token = event;
     });
   }
