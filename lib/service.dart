@@ -24,7 +24,7 @@ class SNoteAppState extends ChangeNotifier {
   List<NoteModel> trashNotes = [];
   String displayName = '';
   StreamController<String> tokenStream = StreamController();
-  late NoteService noteService;
+  NoteService? noteService;
   Session? userSession;
   Completer<StreamController> onLoadingFuture = Completer();
   SNoteAppState() {
@@ -64,7 +64,7 @@ class SNoteAppState extends ChangeNotifier {
     _pubTempKey = await keyPair.publicKey.exportJsonWebKey();
     _privateTempKey = await keyPair.privateKey.exportJsonWebKey();
     var data = {"type": "publicKeyFromA", "key": _pubTempKey};
-    noteService.sendToClient(from, json.encode(data));
+    noteService!.sendToClient(from, json.encode(data));
   }
 
   _messageFromClient(String from, String message) async {
@@ -76,7 +76,7 @@ class SNoteAppState extends ChangeNotifier {
         _pubTempKey = await keyPair.publicKey.exportJsonWebKey();
         _privateTempKey = await keyPair.privateKey.exportJsonWebKey();
         var outData = {"type": "publicKeyFromB", "key": _pubTempKey};
-        noteService.sendToClient(from, json.encode(outData));
+        noteService!.sendToClient(from, json.encode(outData));
         var publicKey = await EcdhPublicKey.importJsonWebKey(
             inData['key'] as Map<String, dynamic>, EllipticCurve.p256);
         var privateKey = await EcdhPrivateKey.importJsonWebKey(
@@ -102,7 +102,7 @@ class SNoteAppState extends ChangeNotifier {
           "type": "mainAesKeyFromA",
           "key": iv + base64.encode(encryptedBytes)
         };
-        noteService.sendToClient(from, json.encode(outData));
+        noteService!.sendToClient(from, json.encode(outData));
         _aesKeyExchangeDoneCallback!();
         break;
 
@@ -147,15 +147,17 @@ class SNoteAppState extends ChangeNotifier {
     displayName = userSession!.user.email!;
     seStorage = const FlutterSecureStorage();
 
-    noteService = NoteService(
-      tokenStream,
-      _aesKeyCodeCallback!,
-      _aesKeyCodeVerifyCallback,
-      _messageFromClient,
-      _noteUpdatedCallback,
-    );
+    if (noteService == null) {
+      noteService = NoteService(
+        tokenStream,
+        _aesKeyCodeCallback!,
+        _aesKeyCodeVerifyCallback,
+        _messageFromClient,
+        _noteUpdatedCallback,
+      );
+    }
 
-    noteService.onLoadingFuture.future.then((value) {
+    noteService!.onLoadingFuture.future.then((value) {
       if (onLoadingFuture.isCompleted == false) {
         onLoadingFuture.complete(value);
       }
@@ -166,7 +168,7 @@ class SNoteAppState extends ChangeNotifier {
       clientId = uuid.v4().toString();
       await seStorage.write(key: 'client_id', value: clientId);
     }
-    var clientCountFuture = noteService.registClient(clientId);
+    var clientCountFuture = noteService!.registClient(clientId);
 
     var aesKeyBase64 = await seStorage.read(key: 'note_aes_key');
     if (aesKeyBase64 == null && await clientCountFuture <= 1) {
@@ -179,8 +181,8 @@ class SNoteAppState extends ChangeNotifier {
       _aesKeyRequireCallback!();
     } else {
       mainAesKey = base64.decode(aesKeyBase64);
-      noteService.setAesKey(mainAesKey!);
-      noteService.getRpcClient();
+      noteService!.setAesKey(mainAesKey!);
+      noteService!.getRpcClient();
       await fetchNotes();
     }
   }
@@ -202,7 +204,7 @@ class SNoteAppState extends ChangeNotifier {
       notifyListeners();
     }
     var lastTimestamp = await db.getLastUpdatedAt();
-    var remoteNotes = await noteService.loadNotesHttp(lastTimestamp);
+    var remoteNotes = await noteService!.loadNotesHttp(lastTimestamp);
     var mergedNotes = updateLocalNotes(localNotes, remoteNotes);
     seperatedNotes = trashNoteSeperate(mergedNotes);
     normalNotes.clear();
@@ -245,7 +247,7 @@ class SNoteAppState extends ChangeNotifier {
   }
 
   void prepareKeyExchange() {
-    noteService.prepareKeyExchange();
+    noteService!.prepareKeyExchange();
   }
 
   List<dynamic> getById(String id) {
@@ -268,7 +270,7 @@ class SNoteAppState extends ChangeNotifier {
       return;
     }
     note.content = content;
-    await noteService.updateNote(id, content);
+    await noteService!.updateNote(id, content);
   }
 
   NoteModel createNote() {
@@ -279,7 +281,7 @@ class SNoteAppState extends ChangeNotifier {
   }
 
   Future<void> deleteNote(NoteModel note) async {
-    await noteService.deleteNote(note.id);
+    await noteService!.deleteNote(note.id);
     notifyListeners();
   }
 
@@ -289,7 +291,7 @@ class SNoteAppState extends ChangeNotifier {
   }
 
   void verifyAesExchangeCode(String code) {
-    noteService.verifyAesExchangeCode(code);
+    noteService!.verifyAesExchangeCode(code);
   }
 
   Future<List<NoteModel>> searchNotes(String query) async {

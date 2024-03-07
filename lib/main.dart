@@ -124,7 +124,9 @@ class AuthGate extends StatelessWidget {
           });
           return ChangeNotifierProvider(
             create: (context) => appState,
-            child: const SNoteMain(),
+            builder: ((context, child) {
+              return const SNoteMain();
+            }),
           );
         });
   }
@@ -135,7 +137,7 @@ class SNoteMain extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var appState = Provider.of<SNoteAppState>(context, listen: false);
+    var appState = context.read<SNoteAppState>();
     appState.listenForAesKeyRequire(() {
       showModalBottomSheet(
           context: context,
@@ -172,7 +174,12 @@ class SNoteMain extends StatelessWidget {
     });
     appState.checkAesKey();
 
-    return const SNoteHome();
+    return ChangeNotifierProvider<SNoteAppState>.value(
+      value: appState,
+      builder: (context, child) {
+        return const SNoteHome();
+      },
+    );
   }
 }
 
@@ -181,7 +188,7 @@ class SNoteHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var appState = Provider.of<SNoteAppState>(context, listen: false);
+    var appState = context.read<SNoteAppState>();
     return Scaffold(
       body: const NoteCards(),
       floatingActionButton: FloatingActionButton(
@@ -200,10 +207,13 @@ class SNoteHome extends StatelessWidget {
         child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
-      bottomNavigationBar: const _BottomAppBar(),
-      drawer: MainDrawer(
-        appState: appState,
+      bottomNavigationBar: ChangeNotifierProvider<SNoteAppState>.value(
+        value: appState,
+        builder: (context, child) {
+          return const _BottomAppBar();
+        },
       ),
+      drawer: const MainDrawer(),
     );
   }
 }
@@ -213,7 +223,6 @@ class SNoteTrash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var appState = Provider.of<SNoteAppState>(context, listen: false);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -231,16 +240,13 @@ class SNoteTrash extends StatelessWidget {
         ),
       ),
       bottomNavigationBar: const _BottomAppBar(),
-      drawer: MainDrawer(
-        appState: appState,
-      ),
+      drawer: const MainDrawer(),
     );
   }
 }
 
 class MainDrawer extends StatelessWidget {
-  final SNoteAppState appState;
-  const MainDrawer({super.key, required this.appState});
+  const MainDrawer({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +263,7 @@ class MainDrawer extends StatelessWidget {
                 builder: (context) =>
                     ChangeNotifierProvider<SNoteAppState>.value(
                       value: appState,
-                      child: const SNoteHome(),
+                      builder: (context, child) => const SNoteHome(),
                     )));
           },
         ),
@@ -277,7 +283,7 @@ class MainDrawer extends StatelessWidget {
                 builder: (context) =>
                     ChangeNotifierProvider<SNoteAppState>.value(
                       value: appState,
-                      child: const SNoteTrash(),
+                      builder: (context, child) => const SNoteTrash(),
                     )));
           },
         ),
@@ -299,6 +305,7 @@ class _BottomAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var appState = context.read<SNoteAppState>();
     return BottomAppBar(
       color: Theme.of(context).colorScheme.background,
       child: IconTheme(
@@ -315,7 +322,7 @@ class _BottomAppBar extends StatelessWidget {
             ),
             IconButton(
                 onPressed: () {
-                  showSearch(context: context, delegate: NoteSearch());
+                  showSearch(context: context, delegate: NoteSearch(appState));
                 },
                 icon: const Icon(Icons.search))
           ],
@@ -478,7 +485,7 @@ class NoteEditor extends StatelessWidget {
   final List imageData = [];
   @override
   Widget build(BuildContext context) {
-    var appState = Provider.of<SNoteAppState>(context, listen: false);
+    var appState = context.read<SNoteAppState>();
     var content = note.content;
     var quillContent;
     for (var d in content) {
@@ -763,7 +770,7 @@ class KeyExchangeCodePop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var appState = Provider.of<SNoteAppState>(context, listen: false);
+    var appState = context.read<SNoteAppState>();
     appState.listenForAesKeyExchangeDone(() {
       Navigator.pop(context);
     });
@@ -793,6 +800,9 @@ class KeyExchangeCodePop extends StatelessWidget {
 }
 
 class NoteSearch extends SearchDelegate {
+  // the showSearch using navigator push inside,which will create new context,so I had to pass appstate by param
+  SNoteAppState appState;
+  NoteSearch(this.appState);
   @override
   List<Widget>? buildActions(BuildContext context) {
     return [
@@ -819,7 +829,6 @@ class NoteSearch extends SearchDelegate {
   final String debouncerId = 'search-debouncer';
   @override
   Widget buildResults(BuildContext context) {
-    var appState = context.watch<SNoteAppState>();
     EasyDebounce.cancel(debouncerId);
     var result = appState.searchNotes(query);
     return showFutureResult(result);
@@ -831,7 +840,13 @@ class NoteSearch extends SearchDelegate {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done &&
               snapshot.hasData) {
-            return NoteCards(searchResult: snapshot.data);
+            return ChangeNotifierProvider<SNoteAppState>.value(
+                value: appState, child: NoteCards(searchResult: snapshot.data));
+            // below method will cause SnoteAppState dispose, I don't know why
+            // return ChangeNotifierProvider(create: (context) => appState,
+            //   builder: (context, child) =>
+            //       NoteCards(searchResult: snapshot.data),
+            // );
           } else {
             /* 
             I want keep showing previous result while user typing, but at here it will fire every time user typed a single letter
@@ -845,19 +860,18 @@ class NoteSearch extends SearchDelegate {
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    var appState = context.watch<SNoteAppState>();
-    Completer _completer = Completer();
+    Completer completer = Completer();
 
     EasyDebounce.debounce(debouncerId, const Duration(milliseconds: 500),
         () async {
       if (query.isEmpty) {
-        _completer.complete(<NoteModel>[]);
+        completer.complete(<NoteModel>[]);
         return;
       }
       var result = await appState.searchNotes(query);
-      _completer.complete(result);
+      completer.complete(result);
       // showResults(context);
     });
-    return showFutureResult(_completer.future);
+    return showFutureResult(completer.future);
   }
 }

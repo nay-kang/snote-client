@@ -12,13 +12,15 @@ do not update if note content remain unchange {cm:2023-12-27}
 device will receive grpc update notify even the modify is made by the device-self
 add recycle-box {cm:2023-12-27}
 add ability of restore note from trash.eg: restore button or after edit content. {cm:2023-12-28}
-get user info from firebase in server python
+get user info from firebase in server python - replaced by supabase {cm:2024-03-06}
 show user info at profile {cm:2024-01-03}
 add global loading animation {cm:2024-01-05}
 auto focus on end of note
 new note not showing bug {cm:2024-01-03}
 disable empty note saving {cm:2024-01-03}
-replace firebase auth due to some country can not connect to firebase
-try to erase note aeskey when user change. be carefull user re-login
-seems supabase long time no active will cause server verify expired.not fully tested
+replace firebase auth due to some country can not connect to firebase {cm:2024-03-06}
+try to erase note aeskey when user change. be carefull user re-login {cm:2024-03-06}
+seems supabase long time no active will cause server verify expired.not fully tested {cm:2024-03-06}
 add loading after fill login code
+fix search showing bug after refactor the layout code
+trigger update after the app resume
