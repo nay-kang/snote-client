@@ -22,5 +22,5 @@ replace firebase auth due to some country can not connect to firebase {cm:2024-0
 try to erase note aeskey when user change. be carefull user re-login {cm:2024-03-06}
 seems supabase long time no active will cause server verify expired.not fully tested {cm:2024-03-06}
 add loading after fill login code
-fix search showing bug after refactor the layout code
-trigger update after the app resume
+fix search showing bug after refactor the layout code {cm:2024-03-08}
+trigger update after the app resume {cm:2024-03-08}

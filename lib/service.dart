@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:snote/util.dart';
@@ -19,7 +20,7 @@ import 'package:archive/archive.dart';
 
 var logger = Slogger();
 
-class SNoteAppState extends ChangeNotifier {
+class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
   List<NoteModel> normalNotes = [];
   List<NoteModel> trashNotes = [];
   String displayName = '';
@@ -34,6 +35,20 @@ class SNoteAppState extends ChangeNotifier {
         tokenStream.add(userSession!.accessToken);
       }
     });
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      fetchNotes();
+    }
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    WidgetsBinding.instance.removeObserver(this);
   }
 
   listenForAesKeyRequire(Function aesKeyRequireCallback) {
@@ -147,15 +162,13 @@ class SNoteAppState extends ChangeNotifier {
     displayName = userSession!.user.email!;
     seStorage = const FlutterSecureStorage();
 
-    if (noteService == null) {
-      noteService = NoteService(
-        tokenStream,
-        _aesKeyCodeCallback!,
-        _aesKeyCodeVerifyCallback,
-        _messageFromClient,
-        _noteUpdatedCallback,
-      );
-    }
+    noteService ??= NoteService(
+      tokenStream,
+      _aesKeyCodeCallback!,
+      _aesKeyCodeVerifyCallback,
+      _messageFromClient,
+      _noteUpdatedCallback,
+    );
 
     noteService!.onLoadingFuture.future.then((value) {
       if (onLoadingFuture.isCompleted == false) {

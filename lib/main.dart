@@ -122,8 +122,8 @@ class AuthGate extends StatelessWidget {
               }
             });
           });
-          return ChangeNotifierProvider(
-            create: (context) => appState,
+          return ChangeNotifierProvider.value(
+            value: appState,
             builder: ((context, child) {
               return const SNoteMain();
             }),
