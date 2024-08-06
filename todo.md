@@ -24,3 +24,9 @@ seems supabase long time no active will cause server verify expired.not fully te
 add loading after fill login code
 fix search showing bug after refactor the layout code {cm:2024-03-08}
 trigger update after the app resume {cm:2024-03-08}
+pause auto update while in edit page,on update while in list page
+bug: failed to update list after save edit sometimes
+feature: in edit page search
+feature: auto save when in edit page
+feature: redo able
+feature: increase margin in edit page to allow better selection

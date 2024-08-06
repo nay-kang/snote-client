@@ -32,7 +32,8 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
     Supabase.instance.client.auth.onAuthStateChange.listen((event) {
       userSession = event.session;
       if (userSession != null && userSession?.isExpired == false) {
-        tokenStream.add(userSession!.accessToken);
+        tokenStream
+            .add("${userSession!.accessToken}${userSession!.refreshToken}");
       }
     });
     WidgetsBinding.instance.addObserver(this);

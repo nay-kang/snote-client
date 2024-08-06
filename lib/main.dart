@@ -544,7 +544,7 @@ class NoteEditor extends StatelessWidget {
       body: Column(children: [
         Expanded(
             child: Container(
-          padding: const EdgeInsets.all(8),
+          margin: const EdgeInsets.fromLTRB(18, 10, 18, 10),
           child: quill.QuillProvider(
             configurations:
                 quill.QuillConfigurations(controller: textController),
