@@ -347,19 +347,15 @@ class NoteThumb extends StatelessWidget {
         case 'quill':
           var textController = quill.QuillController.basic();
           textController.document = quill.Document.fromJson(d['value']);
-          var quillWg = quill.QuillProvider(
-            configurations:
-                quill.QuillConfigurations(controller: textController),
-            child: quill.QuillEditor(
-              configurations: const quill.QuillEditorConfigurations(
-                scrollable: true,
-                autoFocus: false,
-                readOnly: true,
-                expands: false,
-                padding: EdgeInsets.zero,
-              ),
-              scrollController: ScrollController(),
-              focusNode: FocusNode(),
+          textController.readOnly = true;
+          var quillWg = quill.QuillEditor.basic(
+            controller: textController,
+            configurations: const quill.QuillEditorConfigurations(
+              scrollable: true,
+              autoFocus: false,
+              // readOnly: true,
+              expands: false,
+              padding: EdgeInsets.zero,
             ),
           );
           quillWidgets = quillWg;
@@ -544,13 +540,10 @@ class NoteEditor extends StatelessWidget {
       body: Column(children: [
         Expanded(
             child: Container(
-          margin: const EdgeInsets.fromLTRB(18, 10, 18, 10),
-          child: quill.QuillProvider(
-            configurations:
-                quill.QuillConfigurations(controller: textController),
-            child: quill.QuillEditor.basic(),
-          ),
-        )),
+                margin: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+                child: quill.QuillEditor.basic(
+                  controller: textController,
+                ))),
         //using statefulbuilder to keep text unchanged while update image change
         StatefulBuilder(
           builder: ((context, setState) {
@@ -587,11 +580,12 @@ class NoteEditor extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            quill.QuillProvider(
-                configurations:
-                    quill.QuillConfigurations(controller: textController),
-                child: quill.QuillToolbar(
-                  configurations: quill.QuillToolbarConfigurations(
+            quill.QuillToolbar.simple(
+                controller: textController,
+                configurations: quill.QuillSimpleToolbarConfigurations(
+                    customButtons: [imageBtn],
+                    showListBullets: true,
+                    showListCheck: true,
                     showAlignmentButtons: false,
                     showBackgroundColorButton: false,
                     showBoldButton: false,
@@ -610,8 +604,6 @@ class NoteEditor extends StatelessWidget {
                     showJustifyAlignment: false,
                     showLeftAlignment: false,
                     showLink: false,
-                    showListBullets: true,
-                    showListCheck: true,
                     showListNumbers: false,
                     showQuote: false,
                     showRedo: false,
@@ -623,9 +615,10 @@ class NoteEditor extends StatelessWidget {
                     showUndo: false,
                     showSubscript: false,
                     showSuperscript: false,
-                    customButtons: [imageBtn],
-                  ),
-                )),
+                    showClipboardCopy: false,
+                    showClipboardCut: false,
+                    showClipboardPaste: false,
+                    showLineHeightButton: false)),
             generatePopupMenu(appState, note, context)
           ],
         ),

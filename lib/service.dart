@@ -14,7 +14,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:webcrypto/webcrypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:json_rpc_2/json_rpc_2.dart' as jrpc;
-import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:libsimple_flutter/libsimple_flutter.dart';
 import 'package:archive/archive.dart';
 
@@ -622,7 +622,7 @@ class NoteModel {
     id ??= uuid.v4();
     this.id = id;
     if (content == null) {
-      var delta = quill.Delta();
+      var delta = quill_delta.Delta();
       delta.insert('\n');
       content = [
         {'type': 'quill', 'value': delta.toJson()}
