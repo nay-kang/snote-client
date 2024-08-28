@@ -20,21 +20,40 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 var logger = Slogger();
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FlutterError.onError = (errorDetails) {
+    showErrorMessage(errorDetails.exceptionAsString());
     FirebaseCrashlytics.instance.recordFlutterError(errorDetails);
   };
   // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
   PlatformDispatcher.instance.onError = (error, stack) {
+    showErrorMessage(error.toString());
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };
   await Supabase.initialize(
       anonKey: supa_config.publicKey, url: supa_config.url);
   runApp(const SNoteApp());
+}
+
+void showErrorMessage(String error) {
+  scaffoldMessengerKey.currentState?.showSnackBar(
+    SnackBar(
+      content: Text(error),
+      duration: const Duration(milliseconds: 3000),
+      margin: const EdgeInsets.fromLTRB(15, 0, 15, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10.0),
+      ),
+    ),
+  );
 }
 
 class GlobalLoadingIndicatorWidget {
@@ -85,6 +104,7 @@ class SNoteApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scaffoldMessengerKey: scaffoldMessengerKey,
       theme: ThemeData(
           useMaterial3: false,
           brightness: Brightness.light,

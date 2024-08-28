@@ -30,3 +30,4 @@ feature: in edit page search
 feature: auto save when in edit page
 feature: redo able
 feature: increase margin in edit page to allow better selection
+feature: display error message {cm:2024-08-29}
