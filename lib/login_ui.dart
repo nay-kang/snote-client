@@ -1,28 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'auth.dart';
 
-class PasswordLessLogin extends StatefulWidget {
+var logger = Logger();
+
+class PasswordLessLogin extends StatelessWidget {
   const PasswordLessLogin({super.key});
 
   @override
-  State<PasswordLessLogin> createState() => _PasswordLessLoginState();
-}
-
-class _PasswordLessLoginState extends State<PasswordLessLogin> {
-  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-        home: UsernameInput(),
-        theme: ThemeData(
-          useMaterial3: false,
-          brightness: Brightness.light,
-        ),
-        darkTheme: ThemeData(brightness: Brightness.dark, useMaterial3: false));
+    return UsernameInput();
   }
 }
-
-var logger = Logger();
 
 class UsernameInput extends StatelessWidget {
   final TextEditingController nameController = TextEditingController();
@@ -71,35 +60,10 @@ class UsernameInput extends StatelessWidget {
                 child: ElevatedButton(
                   child: const Text('Next'),
                   onPressed: () {
-                    // var toOtpCodePage = PageRouteBuilder(
-                    //   pageBuilder: (context, animation, secondaryAnimation) =>
-                    //       Theme(
-                    //           data: Theme.of(context),
-                    //           child:
-                    //               OtpCodeInput(email: nameController.text)),
-                    //   transitionsBuilder:
-                    //       (context, animation, secondaryAnimation, child) {
-                    //     const begin = Offset(1.0, 0.0);
-                    //     const end = Offset.zero;
-                    //     const curve = Curves.ease;
-
-                    //     var tween = Tween(begin: begin, end: end)
-                    //         .chain(CurveTween(curve: curve));
-
-                    //     return SlideTransition(
-                    //       position: animation.drive(tween),
-                    //       child: child,
-                    //     );
-                    //   },
-                    // );
-
-                    // Navigator.of(context).push(toOtpCodePage);
-
                     Navigator.of(context).push(MaterialPageRoute(
                         builder: (context) =>
                             OtpCodeInput(email: nameController.text)));
-                    Supabase.instance.client.auth
-                        .signInWithOtp(email: nameController.text);
+                    AuthManager.getInstance().requestOtp(nameController.text);
                   },
                 )),
           ],
@@ -148,14 +112,13 @@ class OtpCodeInput extends StatelessWidget {
                       child: ElevatedButton(
                         child: const Text('Submit'),
                         onPressed: () async {
-                          Supabase.instance.client.auth
-                              .verifyOTP(
+                          AuthManager.getInstance()
+                              .login(
                             email: email,
-                            token: otpController.text,
-                            type: OtpType.email,
+                            otpCode: otpController.text,
                           )
                               .then((res) {
-                            if (res.session != null) {
+                            if (res) {
                               Navigator.of(context).pop();
                             }
                           });

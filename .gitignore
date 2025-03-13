@@ -82,5 +82,11 @@ doc/api/
 ios/Podfile.lock
 macos/Podfile.lock
 
-# supabase
-lib/supabase_options.dart
+android/app/local.properties
+devtools_options.yaml
+android/app/.gradle/
+android/gradle/.tmp/
+android/gradle/caches/
+android/gradle/daemon/
+android/gradle/native/
+android/gradle/wrapper/dists/

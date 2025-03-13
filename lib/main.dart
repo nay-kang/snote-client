@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:snote/login_ui.dart';
-import 'package:snote/supabase_options.dart' as supa_config;
 import 'firebase_options.dart';
 import 'package:pinput/pinput.dart';
 import 'dart:math';
@@ -17,7 +16,7 @@ import 'package:photo_view/photo_view.dart';
 import 'service.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'auth.dart';
 
 var logger = Slogger();
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
@@ -25,6 +24,7 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AuthManager.getInstance(); // Initialize AuthManager
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FlutterError.onError = (errorDetails) {
     showErrorMessage(errorDetails.exceptionAsString());
@@ -36,8 +36,7 @@ Future<void> main() async {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };
-  await Supabase.initialize(
-      anonKey: supa_config.publicKey, url: supa_config.url);
+
   runApp(const SNoteApp());
 }
 
@@ -113,7 +112,9 @@ class SNoteApp extends StatelessWidget {
           brightness: Brightness.dark,
           useMaterial3: false,
           fontFamily: 'MyNotoSansSC'),
-      home: AuthGate(),
+      home: Builder(
+        builder: (context) => AuthGate(),
+      ),
     );
   }
 }
@@ -121,15 +122,33 @@ class SNoteApp extends StatelessWidget {
 class AuthGate extends StatelessWidget {
   AuthGate({super.key});
   final appState = SNoteAppState();
-
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
-        stream: Supabase.instance.client.auth.onAuthStateChange,
+    return StreamBuilder<AuthState>(
+        stream: AuthManager.getInstance().authStateChanges,
         builder: (context, authState) {
-          if (!authState.hasData || authState.data?.session == null) {
-            return const PasswordLessLogin();
+          if (authState.hasError) {
+            showErrorMessage(authState.error.toString());
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
           }
+
+          if (authState.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          final state = authState.data!;
+          if (!state.isAuthenticated) {
+            return const PasswordLessLogin(); // PasswordLessLogin is now wrapped in root MaterialApp
+          }
+
           appState.onLoadingFuture.future.then((streamController) {
             if (streamController.hasListener) {
               return;
@@ -209,6 +228,7 @@ class SNoteHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = context.read<SNoteAppState>();
+    appState.currentScreen = 'SNoteHome';
     return Scaffold(
       body: const NoteCards(),
       floatingActionButton: FloatingActionButton(
@@ -279,6 +299,7 @@ class MainDrawer extends StatelessWidget {
           leading: const Icon(Icons.home),
           title: const Text('Home'),
           onTap: () {
+            appState.currentScreen = 'SNoteHome';
             Navigator.of(context).pushReplacement(MaterialPageRoute(
                 builder: (context) =>
                     ChangeNotifierProvider<SNoteAppState>.value(
@@ -299,6 +320,7 @@ class MainDrawer extends StatelessWidget {
           leading: const Icon(Icons.delete),
           title: const Text('Trash'),
           onTap: () {
+            appState.currentScreen = 'SNoteTrash';
             Navigator.of(context).push(MaterialPageRoute(
                 builder: (context) =>
                     ChangeNotifierProvider<SNoteAppState>.value(
@@ -312,7 +334,7 @@ class MainDrawer extends StatelessWidget {
           title: const Text('Sign Out'),
           onTap: () {
             appState.remoteAesKey();
-            Supabase.instance.client.auth.signOut();
+            AuthManager.getInstance().logout();
           },
         )
       ],
@@ -327,7 +349,7 @@ class _BottomAppBar extends StatelessWidget {
   Widget build(BuildContext context) {
     var appState = context.read<SNoteAppState>();
     return BottomAppBar(
-      color: Theme.of(context).colorScheme.background,
+      color: Theme.of(context).colorScheme.surface,
       child: IconTheme(
         data: IconThemeData(
             color: Theme.of(context).colorScheme.onPrimaryContainer),
@@ -502,6 +524,7 @@ class NoteEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = context.read<SNoteAppState>();
+    appState.currentScreen = 'NoteEditor';
     var content = note.content;
     var quillContent;
     for (var d in content) {
@@ -552,6 +575,7 @@ class NoteEditor extends StatelessWidget {
               content.add({"type": 'image', "value": base64.encode(img)});
             }
             appState.updateContent(note.id, content).then((_) {
+              appState.currentScreen = 'SNoteHome';
               Navigator.pop(context);
             });
           },

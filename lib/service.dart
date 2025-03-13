@@ -3,12 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:snote/util.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:webcrypto/webcrypto.dart';
@@ -17,6 +15,7 @@ import 'package:json_rpc_2/json_rpc_2.dart' as jrpc;
 import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:libsimple_flutter/libsimple_flutter.dart';
 import 'package:archive/archive.dart';
+import 'auth.dart';
 
 var logger = Slogger();
 
@@ -26,14 +25,14 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
   String displayName = '';
   StreamController<String> tokenStream = StreamController();
   NoteService? noteService;
-  Session? userSession;
+  AuthState? userSession;
   Completer<StreamController> onLoadingFuture = Completer();
+  String currentScreen = '';
   SNoteAppState() {
-    Supabase.instance.client.auth.onAuthStateChange.listen((event) {
-      userSession = event.session;
-      if (userSession != null && userSession?.isExpired == false) {
-        tokenStream
-            .add("${userSession!.accessToken}${userSession!.refreshToken}");
+    AuthManager.getInstance().authStateChanges.listen((event) {
+      userSession = event;
+      if (event.isAuthenticated) {
+        tokenStream.add(event.accessToken!);
       }
     });
     WidgetsBinding.instance.addObserver(this);
@@ -41,7 +40,7 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && currentScreen == 'SNoteHome') {
       fetchNotes();
     }
   }
@@ -157,10 +156,10 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
   Uint8List? mainAesKey;
   late FlutterSecureStorage seStorage;
   Future<void> checkAesKey() async {
-    if (userSession == null) {
+    if (userSession == null || userSession!.isAuthenticated == false) {
       return;
     }
-    displayName = userSession!.user.email!;
+    displayName = userSession!.email!;
     seStorage = const FlutterSecureStorage();
 
     noteService ??= NoteService(
@@ -412,9 +411,7 @@ class NoteService {
 
   Future<String> getHost() async {
     if (host == null) {
-      var env = const bool.fromEnvironment('dart.vm.product') ? 'prod' : 'dev';
-      var configJson = await rootBundle.loadString('assets/config.$env.json');
-      var config = jsonDecode(configJson);
+      var config = await getConfig();
       host = config['api_host'];
     }
     return host!;

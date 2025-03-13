@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -51,4 +54,17 @@ Future<Uint8List> compressImage(Uint8List data) async {
   logger.i(
       "image compress source:${desc.width}/${desc.height}:${data.length} dest:${destWidth.round()}/${destHeight.round()}:${result.length}");
   return result;
+}
+
+Map<String, dynamic>? _cachedConfig;
+
+Future<Map<String, dynamic>> getConfig() async {
+  if (_cachedConfig != null) {
+    return _cachedConfig!;
+  }
+
+  var env = kReleaseMode ? 'prod' : 'dev';
+  var configJson = await rootBundle.loadString('assets/config.$env.json');
+  _cachedConfig = jsonDecode(configJson) as Map<String, dynamic>;
+  return _cachedConfig!;
 }
