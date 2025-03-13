@@ -119,6 +119,6 @@ flutter:
   # see https://flutter.dev/custom-fonts/#from-packages
 
   fonts:
-    - family: MyNotoSansSC
+    - family: NotoSansSC
       fonts: 
-        - asset: fonts/NotoSansSC-VariableFont_wght.ttf
+        - asset: fonts/NotoSansSC-Regular.ttf

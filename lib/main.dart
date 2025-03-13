@@ -107,11 +107,11 @@ class SNoteApp extends StatelessWidget {
       theme: ThemeData(
           useMaterial3: false,
           brightness: Brightness.light,
-          fontFamily: 'MyNotoSansSC'),
+          fontFamily: 'NotoSansSC'),
       darkTheme: ThemeData(
           brightness: Brightness.dark,
           useMaterial3: false,
-          fontFamily: 'MyNotoSansSC'),
+          fontFamily: 'NotoSansSC'),
       home: Builder(
         builder: (context) => AuthGate(),
       ),
