@@ -42,6 +42,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/app/.cxx/
 
 # Debug data
 /assets/fake_notes.json
@@ -52,6 +53,7 @@ ios/Runner/GoogleService-Info.plist
 lib/firebase_options.dart
 macos/Runner/GoogleService-Info.plist
 macos/firebase_app_id_file.json
+firebase.json
 
 # See https://www.dartlang.org/guides/libraries/private-files
 

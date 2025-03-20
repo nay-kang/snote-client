@@ -108,15 +108,15 @@ class Config {
               .timeout(const Duration(seconds: 2));
           if (response.statusCode == 200 && !completer.isCompleted) {
             final latency = DateTime.now().difference(start).inMilliseconds;
-            logger.i('Host $host responded in ${latency}ms');
+            debugPrint('Host $host responded in ${latency}ms');
             completer.complete(host);
           }
         } catch (_) {
           failedHosts++;
           // If all hosts failed, complete with first host
           if (failedHosts == hosts.length && !completer.isCompleted) {
-            logger
-                .w('All hosts failed, falling back to first host: ${hosts[0]}');
+            debugPrint(
+                'All hosts failed, falling back to first host: ${hosts[0]}');
             completer.complete(hosts[0]);
           }
         }
