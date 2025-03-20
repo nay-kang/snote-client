@@ -410,11 +410,7 @@ class NoteService {
   }
 
   Future<String> getHost() async {
-    if (host == null) {
-      var config = await getConfig();
-      host = config['api_host'];
-    }
-    return host!;
+    return await Config.instance.host;
   }
 
   Future<NoteModel> updateNote(String id, List<dynamic> content) async {

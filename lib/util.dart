@@ -6,6 +6,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'dart:math';
 import 'package:logger/logger.dart';
 
@@ -56,15 +57,71 @@ Future<Uint8List> compressImage(Uint8List data) async {
   return result;
 }
 
-Map<String, dynamic>? _cachedConfig;
+class Config {
+  Config._internal();
+  static final Config instance = Config._internal();
 
-Future<Map<String, dynamic>> getConfig() async {
-  if (_cachedConfig != null) {
-    return _cachedConfig!;
+  String? _host;
+  bool _hostBenchmarkRun = false;
+
+  Future<String> get host async {
+    if (_host != null) return _host!;
+    var config = await getConfig();
+    var hosts = config['api_hosts'];
+    // the first host is the default host,ensure can be used
+    if (_hostBenchmarkRun) {
+      return hosts[0];
+    }
+    _hostBenchmarkRun = true;
+    var hostFuture = findFastestHost(hosts);
+    hostFuture.then((host) {
+      _host = host;
+    });
+    return hosts[0];
   }
 
-  var env = kReleaseMode ? 'prod' : 'dev';
-  var configJson = await rootBundle.loadString('assets/config.$env.json');
-  _cachedConfig = jsonDecode(configJson) as Map<String, dynamic>;
-  return _cachedConfig!;
+  Map<String, dynamic>? _config;
+  Future<Map<String, dynamic>> getConfig() async {
+    if (_config != null) {
+      return _config!;
+    }
+
+    var env = kReleaseMode ? 'prod' : 'dev';
+    var configJson = await rootBundle.loadString('assets/config.$env.json');
+    _config = jsonDecode(configJson) as Map<String, dynamic>;
+    _config?['api_hosts'] = (_config?['api_hosts'] as List<dynamic>)
+        .map((e) => e.toString())
+        .toList();
+    return _config!;
+  }
+
+  Future<String> findFastestHost(List<String> hosts) {
+    var completer = Completer<String>();
+    var failedHosts = 0;
+
+    for (var host in hosts) {
+      (() async {
+        final start = DateTime.now();
+        try {
+          final response = await http
+              .get(Uri.parse('$host/api/hello/'))
+              .timeout(const Duration(seconds: 2));
+          if (response.statusCode == 200 && !completer.isCompleted) {
+            final latency = DateTime.now().difference(start).inMilliseconds;
+            logger.i('Host $host responded in ${latency}ms');
+            completer.complete(host);
+          }
+        } catch (_) {
+          failedHosts++;
+          // If all hosts failed, complete with first host
+          if (failedHosts == hosts.length && !completer.isCompleted) {
+            logger
+                .w('All hosts failed, falling back to first host: ${hosts[0]}');
+            completer.complete(hosts[0]);
+          }
+        }
+      })();
+    }
+    return completer.future;
+  }
 }

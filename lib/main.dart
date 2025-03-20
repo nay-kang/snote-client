@@ -17,6 +17,7 @@ import 'service.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'auth.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 var logger = Slogger();
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
@@ -27,6 +28,7 @@ Future<void> main() async {
   AuthManager.getInstance(); // Initialize AuthManager
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FlutterError.onError = (errorDetails) {
+    logger.e(errorDetails.exceptionAsString());
     showErrorMessage(errorDetails.exceptionAsString());
     FirebaseCrashlytics.instance.recordFlutterError(errorDetails);
   };
@@ -107,14 +109,20 @@ class SNoteApp extends StatelessWidget {
       theme: ThemeData(
           useMaterial3: false,
           brightness: Brightness.light,
-          fontFamily: 'NotoSansSC'),
+          fontFamily: 'NotoSansSC-local'),
       darkTheme: ThemeData(
           brightness: Brightness.dark,
           useMaterial3: false,
-          fontFamily: 'NotoSansSC'),
+          fontFamily: 'NotoSansSC-local'),
       home: Builder(
         builder: (context) => AuthGate(),
       ),
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        quill.FlutterQuillLocalizations.delegate,
+      ],
     );
   }
 }
@@ -392,7 +400,7 @@ class NoteThumb extends StatelessWidget {
           textController.readOnly = true;
           var quillWg = quill.QuillEditor.basic(
             controller: textController,
-            configurations: const quill.QuillEditorConfigurations(
+            config: const quill.QuillEditorConfig(
               scrollable: true,
               autoFocus: false,
               // readOnly: true,
@@ -587,7 +595,9 @@ class NoteEditor extends StatelessWidget {
                 margin: const EdgeInsets.fromLTRB(18, 10, 18, 10),
                 child: quill.QuillEditor.basic(
                   controller: textController,
+                  config: const quill.QuillEditorConfig(),
                 ))),
+
         //using statefulbuilder to keep text unchanged while update image change
         StatefulBuilder(
           builder: ((context, setState) {
@@ -621,12 +631,13 @@ class NoteEditor extends StatelessWidget {
                     }));
           }),
         ),
+
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            quill.QuillToolbar.simple(
+            quill.QuillSimpleToolbar(
                 controller: textController,
-                configurations: quill.QuillSimpleToolbarConfigurations(
+                config: quill.QuillSimpleToolbarConfig(
                     customButtons: [imageBtn],
                     showListBullets: true,
                     showListCheck: true,
@@ -650,13 +661,13 @@ class NoteEditor extends StatelessWidget {
                     showLink: false,
                     showListNumbers: false,
                     showQuote: false,
-                    showRedo: false,
+                    showRedo: true,
                     showRightAlignment: false,
                     showSearchButton: false,
                     showSmallButton: false,
                     showStrikeThrough: false,
                     showUnderLineButton: false,
-                    showUndo: false,
+                    showUndo: true,
                     showSubscript: false,
                     showSuperscript: false,
                     showClipboardCopy: false,

@@ -34,8 +34,8 @@ class AuthManager {
   final _baseUrlCompleter = Completer<void>();
 
   AuthManager._internal() {
-    getConfig().then((config) {
-      _baseUrl = config['api_host'];
+    Config.instance.host.then((host) {
+      _baseUrl = host;
       _baseUrlCompleter.complete();
     });
     _loadTokens(); // This will emit the initial state after checking tokens
