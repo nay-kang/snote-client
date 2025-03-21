@@ -404,7 +404,6 @@ class NoteThumb extends StatelessWidget {
             config: const quill.QuillEditorConfig(
               scrollable: true,
               autoFocus: false,
-              // readOnly: true,
               expands: false,
               padding: EdgeInsets.zero,
             ),
@@ -448,15 +447,16 @@ class NoteThumb extends StatelessWidget {
           ),
         ),
       ),
-      onTap: () => {
+      onTap: () {
         Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) =>
-                    ChangeNotifierProvider<SNoteAppState>.value(
-                      value: appState,
-                      child: NoteEditor(note: note),
-                    )))
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
+              value: appState,
+              child: NoteEditor(note: note),
+            ),
+          ),
+        );
       },
     );
   }
@@ -481,14 +481,15 @@ class NoteCards extends StatelessWidget {
     } else {
       noteList = appState.normalNotes;
     }
+    const gridDelegate =
+        SliverSimpleGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 300);
     return RefreshIndicator(
         onRefresh: () async {
           await appState.fetchNotes(refresh: true);
         },
         child: MasonryGridView.builder(
             itemCount: noteList.length,
-            gridDelegate: const SliverSimpleGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 300),
+            gridDelegate: gridDelegate,
             itemBuilder: (context, index) {
               var note = noteList[index];
               return NoteThumb(note: note);
@@ -742,15 +743,23 @@ class KeyExchangePop extends StatefulWidget {
 }
 
 class _KeyExchangePopState extends State<KeyExchangePop> {
+  late final StreamSubscription _subscription;
+
   @override
   void initState() {
     super.initState();
     final appState = Provider.of<SNoteAppState>(context, listen: false);
     appState.prepareKeyExchange();
-    appState.listenForAesKeyExchangeDone(() {
+    _subscription = appState.listenForAesKeyExchangeDone(() {
       appState.checkAesKey();
       Navigator.pop(context);
     });
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
   }
 
   @override
