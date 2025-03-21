@@ -1,7 +1,7 @@
 key code exchange UI improve {cm:2023-06-16}
 update note notification online devices {cm:2023-06-20}
 firebase auth not redirect after registor {cm:2023-06-19}
-input chinese lag,first a box after a few seconds it become the real word
+input chinese lag,first a box after a few seconds it become the real word,fixed by replace to local font {cm:2025-03-21}
 websocket keepalive {cm:2023-06-16}
 android user-agent null {cm:2023-06-16}
 add delete-able {cm:2023-06-19}
@@ -28,6 +28,7 @@ pause auto update while in edit page,on update while in list page {cm:2025-03-13
 bug: failed to update list after save edit sometimes
 feature: in edit page search
 feature: auto save when in edit page
-feature: redo able
+feature: redo able {cm:2025-03-21}
 feature: increase margin in edit page to allow better selection
 feature: display error message {cm:2024-08-29}
+fix DNS lookup failed error when network changed {cm:2025-03-21}

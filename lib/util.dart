@@ -14,8 +14,12 @@ class Slogger extends Logger {
   @override
   void log(Level level, message,
       {DateTime? time, Object? error, StackTrace? stackTrace}) {
-    if (!kIsWeb) {
-      FirebaseCrashlytics.instance.log("$time:$level:$message");
+    if (!kIsWeb && level.index >= Level.warning.index) {
+      try {
+        FirebaseCrashlytics.instance.log("$time:$level:$message");
+      } catch (e) {
+        debugPrint("log to firebase crashlytics failed:$e");
+      }
     }
     super.log(level, message, time: time, error: error, stackTrace: stackTrace);
   }
@@ -108,15 +112,15 @@ class Config {
               .timeout(const Duration(seconds: 2));
           if (response.statusCode == 200 && !completer.isCompleted) {
             final latency = DateTime.now().difference(start).inMilliseconds;
-            debugPrint('Host $host responded in ${latency}ms');
+            logger.i('Host $host responded in ${latency}ms');
             completer.complete(host);
           }
         } catch (_) {
           failedHosts++;
           // If all hosts failed, complete with first host
           if (failedHosts == hosts.length && !completer.isCompleted) {
-            debugPrint(
-                'All hosts failed, falling back to first host: ${hosts[0]}');
+            logger
+                .e('All hosts failed, falling back to first host: ${hosts[0]}');
             completer.complete(hosts[0]);
           }
         }

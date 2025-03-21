@@ -516,41 +516,58 @@ class NoteService {
 
   jrpc.Peer? rpcClient;
   Future<jrpc.Client> getRpcClient() async {
-    if (rpcClient == null) {
+    if (rpcClient == null || rpcClient!.isClosed) {
       var host = await getHost();
       host = host.replaceAll('http', 'ws');
       var uri = Uri.parse("$host/api/ws/");
-      var channel = WebSocketChannel.connect(uri);
 
-      rpcClient = jrpc.Peer(channel.cast<String>());
-      rpcClient!.done.then(
-        (value) {
-          logger.w('websocket closed!');
-          rpcClient = null;
+      try {
+        var channel = WebSocketChannel.connect(uri);
+
+        rpcClient = jrpc.Peer(channel.cast<String>());
+        rpcClient!.done.then(
+          (value) {
+            logger.w('websocket closed!');
+            rpcClient = null;
+            // Try to reconnect after connection lost
+            Future.delayed(const Duration(seconds: 2), () {
+              getRpcClient();
+            });
+          },
+        );
+
+        unawaited(rpcClient!.listen());
+        await tokenFuture.future;
+        var _ = await rpcClient!.sendRequest('auth', {'token': token});
+
+        rpcClient!.registerMethod('aeskeyCodeGenerate',
+            (jrpc.Parameters params) {
+          aesKeyCodeCallback();
+        });
+
+        rpcClient!.registerMethod('aeskeyCodeVerify', (jrpc.Parameters params) {
+          var code = params['code'].asString;
+          var fromClient = params['from'].asString;
+          aesKeyCodeVerifyCallback(code, fromClient);
+        });
+
+        rpcClient!.registerMethod('messageFromClient',
+            (jrpc.Parameters params) {
+          messageFromClient(
+              params['from'].asString, params['message'].asString);
+        });
+
+        rpcClient!.registerMethod('noteUpdated', (jrpc.Parameters params) {
+          noteUpdatedCallback(params['eventAt'].asString);
+        });
+      } catch (e) {
+        logger.e('WebSocket connection error: $e');
+        rpcClient = null;
+        // Try to reconnect after error
+        Future.delayed(const Duration(seconds: 2), () {
           getRpcClient();
-        },
-      );
-      unawaited(rpcClient!.listen());
-      await tokenFuture.future;
-      var _ = await rpcClient!.sendRequest('auth', {'token': token});
-
-      rpcClient!.registerMethod('aeskeyCodeGenerate', (jrpc.Parameters params) {
-        aesKeyCodeCallback();
-      });
-
-      rpcClient!.registerMethod('aeskeyCodeVerify', (jrpc.Parameters params) {
-        var code = params['code'].asString;
-        var fromClient = params['from'].asString;
-        aesKeyCodeVerifyCallback(code, fromClient);
-      });
-
-      rpcClient!.registerMethod('messageFromClient', (jrpc.Parameters params) {
-        messageFromClient(params['from'].asString, params['message'].asString);
-      });
-
-      rpcClient!.registerMethod('noteUpdated', (jrpc.Parameters params) {
-        noteUpdatedCallback(params['eventAt'].asString);
-      });
+        });
+      }
     }
     return rpcClient!;
   }

@@ -28,12 +28,13 @@ Future<void> main() async {
   AuthManager.getInstance(); // Initialize AuthManager
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FlutterError.onError = (errorDetails) {
-    logger.e(errorDetails.exceptionAsString());
+    logger.e(errorDetails.exceptionAsString(), stackTrace: errorDetails.stack);
     showErrorMessage(errorDetails.exceptionAsString());
     FirebaseCrashlytics.instance.recordFlutterError(errorDetails);
   };
   // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
   PlatformDispatcher.instance.onError = (error, stack) {
+    logger.e(error, stackTrace: stack);
     showErrorMessage(error.toString());
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
