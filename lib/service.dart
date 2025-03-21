@@ -270,7 +270,10 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
   /// updateContent also make note from delete status to normal status
   Future<void> updateContent(String id, List<dynamic> content) async {
     var allNotes = normalNotes + trashNotes;
-    var note = allNotes.firstWhere((element) => element.id == id);
+    var note = allNotes.firstWhere(
+      (element) => element.id == id,
+      orElse: () => NoteModel(id: id, content: content),
+    );
     // user only create new content but without type anything.so delete the note
     if (note.empty(newContent: content)) {
       normalNotes.remove(note);
@@ -279,17 +282,15 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
     // prevent trash content restore by just click back from NoteEdtor
     // I want using native compare but it seems has performance issue too. https://github.com/dart-lang/collection/issues/263
     if (jsonEncode(note.content) == jsonEncode(content) &&
-        note.status == NoteStatus.normal) {
+        note.status == NoteStatus.normal &&
+        note.createdAt != null) {
       return;
     }
-    note.content = content;
     await noteService!.updateNote(id, content);
   }
 
   NoteModel createNote() {
     var note = NoteModel();
-    normalNotes.insert(0, note);
-
     return note;
   }
 
