@@ -362,11 +362,16 @@ class HttpClient extends http.BaseClient {
     logger.i('start request ${request.url}');
     onLoading.add(true);
 
-    return _inner.send(request).then((response) async {
-      // logger.d('end request ${request.url}');
+    try {
+      return _inner.send(request).then((response) async {
+        onLoading.add(false);
+        return response;
+      });
+    } catch (e) {
       onLoading.add(false);
-      return response;
-    });
+      logger.e("error on request ${request.url}: $e");
+      rethrow;
+    }
   }
 }
 

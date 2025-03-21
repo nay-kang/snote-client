@@ -734,24 +734,36 @@ class ImageViewer extends StatelessWidget {
   }
 }
 
-class KeyExchangePop extends StatelessWidget {
+class KeyExchangePop extends StatefulWidget {
   const KeyExchangePop({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    var appState = Provider.of<SNoteAppState>(context);
+  State<KeyExchangePop> createState() => _KeyExchangePopState();
+}
+
+class _KeyExchangePopState extends State<KeyExchangePop> {
+  @override
+  void initState() {
+    super.initState();
+    final appState = Provider.of<SNoteAppState>(context, listen: false);
     appState.prepareKeyExchange();
     appState.listenForAesKeyExchangeDone(() {
       appState.checkAesKey();
       Navigator.pop(context);
     });
-    final textController = TextEditingController();
-    const borderColor = Colors.white;
+  }
 
-    const defaultPinTheme = PinTheme(
+  @override
+  Widget build(BuildContext context) {
+    final appState = Provider.of<SNoteAppState>(context);
+    final borderColor = Theme.of(context).colorScheme.onSurface;
+    final textController = TextEditingController();
+
+    final defaultPinTheme = PinTheme(
       width: 56,
       height: 56,
-      textStyle: TextStyle(fontSize: 22, color: Colors.white),
+      textStyle: TextStyle(
+          fontSize: 22, color: Theme.of(context).colorScheme.onSurface),
       decoration: BoxDecoration(),
     );
     final cursor = Column(
@@ -774,7 +786,7 @@ class KeyExchangePop extends StatelessWidget {
           width: 56,
           height: 3,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             borderRadius: BorderRadius.circular(8),
           ),
         ),
@@ -783,7 +795,7 @@ class KeyExchangePop extends StatelessWidget {
 
     return Center(
         child: Column(children: [
-      const Text('Enter Code'),
+      Text('Enter Code', style: Theme.of(context).textTheme.titleLarge),
       Pinput(
         length: 4,
         pinAnimationType: PinAnimationType.slide,
@@ -797,9 +809,10 @@ class KeyExchangePop extends StatelessWidget {
           appState.verifyAesExchangeCode(value);
         },
       ),
-      const Padding(
-        padding: EdgeInsets.fromLTRB(0, 10, 0, 10),
-        child: Text('Please open your other client to generate code'),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+        child: Text('Please open your other client to generate code',
+            style: Theme.of(context).textTheme.bodyMedium),
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
@@ -831,19 +844,24 @@ class KeyExchangeCodePop extends StatelessWidget {
 
     return Center(
         child: Column(children: [
-      const Text('Key Exchange Code'),
+      Text('Key Exchange Code', style: Theme.of(context).textTheme.titleLarge),
       const SizedBox(
         height: 30,
       ),
       Text(
         code,
-        style: const TextStyle(color: Colors.blue, fontSize: 30),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
+          fontSize: 30,
+        ),
       ),
       const SizedBox(
         height: 30,
       ),
-      const Text(
-          'One of your client are requiring the important encryption key\nWhen this code typed means authorize that client to decode your notes')
+      Text(
+        'One of your client are requiring the important encryption key\nWhen this code typed means authorize that client to decode your notes',
+        style: Theme.of(context).textTheme.bodyMedium,
+      )
     ]));
   }
 }

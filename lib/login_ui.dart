@@ -60,6 +60,7 @@ class UsernameInput extends StatelessWidget {
                 child: ElevatedButton(
                   child: const Text('Next'),
                   onPressed: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
                     Navigator.of(context).push(MaterialPageRoute(
                         builder: (context) =>
                             OtpCodeInput(email: nameController.text)));
@@ -78,6 +79,21 @@ class OtpCodeInput extends StatelessWidget {
   OtpCodeInput({super.key, this.email = ''});
 
   final TextEditingController otpController = TextEditingController();
+
+  // new helper method to submit OTP
+  void _submitOTP(BuildContext context) {
+    AuthManager.getInstance()
+        .login(
+      email: email,
+      otpCode: otpController.text,
+    )
+        .then((res) {
+      if (res) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,6 +116,9 @@ class OtpCodeInput extends StatelessWidget {
                     child: TextField(
                       controller: otpController,
                       autofocus: true,
+                      keyboardType: TextInputType.phone,
+                      onSubmitted: (_) =>
+                          _submitOTP(context), // trigger submit on Enter key
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                         labelText: 'Code',
@@ -111,18 +130,7 @@ class OtpCodeInput extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
                       child: ElevatedButton(
                         child: const Text('Submit'),
-                        onPressed: () async {
-                          AuthManager.getInstance()
-                              .login(
-                            email: email,
-                            otpCode: otpController.text,
-                          )
-                              .then((res) {
-                            if (res) {
-                              Navigator.of(context).pop();
-                            }
-                          });
-                        },
+                        onPressed: () => _submitOTP(context),
                       )),
                 ],
               )),
