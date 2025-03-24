@@ -99,7 +99,20 @@ class Config {
     return _config!;
   }
 
-  Future<String> findFastestHost(List<String> hosts) {
+  Future<String> findFastestHost(List<String> hosts) async {
+    // First check host availability
+    var client = http.Client();
+    await Future.wait(hosts.map((host) async {
+      try {
+        var uri = Uri.parse('$host/api/hello/');
+        var request = http.Request("OPTIONS", uri);
+        await client.send(request).timeout(const Duration(seconds: 1));
+        logger.d('Host ${uri.host} is available');
+      } catch (e) {
+        logger.w('Host availability check failed for $host: $e');
+      }
+    }));
+
     var completer = Completer<String>();
     var failedHosts = 0;
 
@@ -115,8 +128,9 @@ class Config {
             logger.i('Host $host responded in ${latency}ms');
             completer.complete(host);
           }
-        } catch (_) {
+        } catch (e) {
           failedHosts++;
+          logger.w('Host $host failed: $e');
           // If all hosts failed, complete with first host
           if (failedHosts == hosts.length && !completer.isCompleted) {
             logger
