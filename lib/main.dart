@@ -18,6 +18,8 @@ import 'package:easy_debounce/easy_debounce.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'auth.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_html/flutter_html.dart';
+import 'package:vsc_quill_delta_to_html/vsc_quill_delta_to_html.dart';
 
 var logger = Slogger();
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
@@ -180,14 +182,24 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-class SNoteMain extends StatelessWidget {
+class SNoteMain extends StatefulWidget {
   const SNoteMain({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    var appState = context.read<SNoteAppState>();
-    appState.listenForAesKeyRequire(() {
-      showModalBottomSheet(
+  State<SNoteMain> createState() => _SNoteMainState();
+}
+
+class _SNoteMainState extends State<SNoteMain> {
+  late SNoteAppState appState;
+  bool _listenersRegistered = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_listenersRegistered) {
+      appState = context.read<SNoteAppState>();
+      appState.listenForAesKeyRequire(() {
+        showModalBottomSheet(
           context: context,
           isDismissible: true,
           enableDrag: true,
@@ -201,10 +213,11 @@ class SNoteMain extends StatelessWidget {
                 child: const KeyExchangePop(),
               ),
             );
-          });
-    });
-    appState.listenForAesKeyCodeGenerate(() {
-      showModalBottomSheet(
+          },
+        );
+      });
+      appState.listenForAesKeyCodeGenerate(() {
+        showModalBottomSheet(
           context: context,
           isDismissible: true,
           enableDrag: true,
@@ -218,10 +231,16 @@ class SNoteMain extends StatelessWidget {
                 child: const KeyExchangeCodePop(),
               ),
             );
-          });
-    });
-    appState.checkAesKey();
+          },
+        );
+      });
+      appState.checkAesKey();
+      _listenersRegistered = true;
+    }
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return ChangeNotifierProvider<SNoteAppState>.value(
       value: appState,
       builder: (context, child) {
@@ -391,14 +410,16 @@ class NoteThumb extends StatefulWidget {
 }
 
 class _NoteThumbState extends State<NoteThumb> {
-  late final quill.QuillController textController;
+  late String htmlContent;
   late List<Uint8List> images;
+  // Add key to force rebuild when content changes
+  Key _contentKey = UniqueKey();
 
   @override
   void initState() {
     super.initState();
-    textController = quill.QuillController.basic();
     images = [];
+    htmlContent = '';
     _initializeContent();
   }
 
@@ -406,8 +427,11 @@ class _NoteThumbState extends State<NoteThumb> {
   void didUpdateWidget(NoteThumb oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.note.content != widget.note.content) {
-      images = [];
-      _initializeContent();
+      setState(() {
+        images = [];
+        _contentKey = UniqueKey(); // Force rebuild with new key
+        _initializeContent();
+      });
     }
   }
 
@@ -415,8 +439,12 @@ class _NoteThumbState extends State<NoteThumb> {
     for (var d in widget.note.content) {
       switch (d['type']) {
         case 'quill':
-          textController.document = quill.Document.fromJson(d['value']);
-          textController.readOnly = true;
+          final document = quill.Document.fromJson(d['value']);
+          var converter = QuillDeltaToHtmlConverter(
+            List.castFrom(document.toDelta().toJson()),
+            ConverterOptions.forEmail(),
+          );
+          htmlContent = converter.convert();
           break;
         case 'image':
           images.add(base64.decode(d['value']));
@@ -426,16 +454,11 @@ class _NoteThumbState extends State<NoteThumb> {
   }
 
   @override
-  void dispose() {
-    textController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     var appState = context.watch<SNoteAppState>();
 
-    Widget medias = const SizedBox(height: 0, width: 0);
+    // Optimize image thumbnails
+    Widget medias = const SizedBox.shrink();
     if (images.isNotEmpty) {
       medias = Positioned(
         bottom: 0,
@@ -443,34 +466,76 @@ class _NoteThumbState extends State<NoteThumb> {
         right: 0,
         height: 50,
         child: ListView.builder(
+          cacheExtent: 50,
           itemCount: images.length,
           scrollDirection: Axis.horizontal,
           itemBuilder: (BuildContext context, int index) {
-            return Image.memory(
-              images[index],
-              cacheHeight: 50,
+            return ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 50,
+                maxHeight: 50,
+              ),
+              child: Image.memory(
+                images[index],
+                cacheHeight: 50,
+                cacheWidth: 50,
+                fit: BoxFit.cover,
+              ),
             );
           },
         ),
       );
     }
 
-    return GestureDetector(
-      child: Card(
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          constraints: const BoxConstraints(maxHeight: 300),
-          child: AbsorbPointer(
-            absorbing: true,
+    return RepaintBoundary(
+      // Add key to force repaint when content changes
+      key: _contentKey,
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
+                value: appState,
+                child: NoteEditor(note: widget.note),
+              ),
+            ),
+          );
+        },
+        child: Card(
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            constraints: const BoxConstraints(maxHeight: 300),
             child: Stack(
               children: [
-                quill.QuillEditor.basic(
-                  controller: textController,
-                  config: const quill.QuillEditorConfig(
-                    scrollable: true,
-                    autoFocus: false,
-                    expands: false,
-                    padding: EdgeInsets.zero,
+                // Use HTML instead of QuillEditor
+                SingleChildScrollView(
+                  physics:
+                      const NeverScrollableScrollPhysics(), // Disable scrolling
+                  padding: EdgeInsets.zero, // Remove padding
+                  // Add key to force HTML widget rebuild
+                  key: ValueKey(
+                      '${widget.note.id}_${widget.note.content.hashCode}'),
+                  child: Html(
+                    data: htmlContent,
+                    style: {
+                      "html": Style(
+                        margin: Margins.zero,
+                        padding: HtmlPaddings.zero,
+                      ),
+                      "body": Style(
+                        margin: Margins.zero,
+                        padding: HtmlPaddings.zero,
+                        fontSize: FontSize(14),
+                        maxLines: 15,
+                        textOverflow: TextOverflow.ellipsis,
+                      ),
+                      "p": Style(
+                        margin: Margins.zero,
+                        padding: HtmlPaddings.zero,
+                      ),
+                    },
+                    shrinkWrap: true, // Ensure content takes minimum space
                   ),
                 ),
                 medias,
@@ -479,17 +544,6 @@ class _NoteThumbState extends State<NoteThumb> {
           ),
         ),
       ),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
-              value: appState,
-              child: NoteEditor(note: widget.note),
-            ),
-          ),
-        );
-      },
     );
   }
 }
@@ -527,8 +581,9 @@ class NoteCards extends StatelessWidget {
                 (context, index) {
                   var note = noteList[index];
                   return RepaintBoundary(
+                    key: ValueKey(note
+                        .id), // Ensure each RepaintBoundary has a unique key
                     child: NoteThumb(
-                      key: ValueKey(note.id),
                       note: note,
                     ),
                   );

@@ -65,6 +65,8 @@ dependencies:
   rxdart: ^0.28.0
   flutter_localizations:
     sdk: flutter
+  flutter_html: ^3.0.0
+  vsc_quill_delta_to_html: ^1.0.5
 
 dev_dependencies:
   flutter_test:
