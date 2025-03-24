@@ -7,6 +7,8 @@ import 'dart:async';
 import 'package:rxdart/rxdart.dart';
 import 'package:snote/util.dart';
 
+var logger = Slogger();
+
 class AuthState {
   final bool isAuthenticated;
   final String? accessToken;
@@ -133,7 +135,7 @@ class AuthManager {
         _refreshTimer = Timer(timeUntilRefresh, refreshTokenPair);
       }
     } catch (e) {
-      debugPrint('Error setting up auto refresh: $e');
+      logger.e('Error setting up auto refresh: $e');
     }
   }
 
@@ -161,7 +163,7 @@ class AuthManager {
       }
     } catch (error) {
       logout();
-      debugPrint('Login error: $error');
+      logger.e('Login error: $error');
     }
     return false;
   }
@@ -182,12 +184,12 @@ class AuthManager {
         return true;
       } else {
         logout();
-        debugPrint('Login failed: ${response.statusCode} ${response.body}');
+        logger.e('Login failed: ${response.statusCode} ${response.body}');
         return false;
       }
     } catch (error) {
       logout();
-      debugPrint('Login error: $error');
+      logger.e('Login error: $error');
       return false;
     }
   }
@@ -214,13 +216,13 @@ class AuthManager {
         return true;
       } else {
         logout();
-        debugPrint(
-            'Token refresh failed: ${response.statusCode} ${response.body}');
+        logger
+            .e('Token refresh failed: ${response.statusCode} ${response.body}');
         return false;
       }
     } catch (error) {
       logout();
-      debugPrint('Token refresh error: $error');
+      logger.e('Token refresh error: $error');
       return false;
     }
   }
