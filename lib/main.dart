@@ -360,8 +360,7 @@ class _BottomAppBar extends StatelessWidget {
     return BottomAppBar(
       color: Theme.of(context).colorScheme.surface,
       child: IconTheme(
-        data: IconThemeData(
-            color: Theme.of(context).colorScheme.onPrimaryContainer),
+        data: IconThemeData(color: Theme.of(context).colorScheme.onSurface),
         child: Row(
           children: <Widget>[
             IconButton(
@@ -515,30 +514,34 @@ class NoteCards extends StatelessWidget {
       noteList = appState.normalNotes;
     }
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        await appState.fetchNotes(refresh: true);
-      },
-      child: CustomScrollView(
-        slivers: [
-          SliverMasonryGrid(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                var note = noteList[index];
-                return RepaintBoundary(
-                  child: NoteThumb(
-                    key: ValueKey(note.id),
-                    note: note,
-                  ),
-                );
-              },
-              childCount: noteList.length,
+    return SafeArea(
+      // Add SafeArea widget
+      child: RefreshIndicator(
+        onRefresh: () async {
+          await appState.fetchNotes(refresh: true);
+        },
+        child: CustomScrollView(
+          slivers: [
+            SliverMasonryGrid(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  var note = noteList[index];
+                  return RepaintBoundary(
+                    child: NoteThumb(
+                      key: ValueKey(note.id),
+                      note: note,
+                    ),
+                  );
+                },
+                childCount: noteList.length,
+              ),
+              gridDelegate:
+                  const SliverSimpleGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 300,
+              ),
             ),
-            gridDelegate: const SliverSimpleGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 300,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
