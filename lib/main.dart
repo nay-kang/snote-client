@@ -383,57 +383,79 @@ class _BottomAppBar extends StatelessWidget {
   }
 }
 
-class NoteThumb extends StatelessWidget {
+class NoteThumb extends StatefulWidget {
   const NoteThumb({super.key, required this.note});
   final NoteModel note;
 
   @override
-  Widget build(BuildContext context) {
-    var appState = context.watch<SNoteAppState>();
-    var content = note.content;
-    Widget? quillWidgets;
-    List<Uint8List> images = [];
-    for (var d in content) {
+  State<NoteThumb> createState() => _NoteThumbState();
+}
+
+class _NoteThumbState extends State<NoteThumb> {
+  late final quill.QuillController textController;
+  late List<Uint8List> images;
+
+  @override
+  void initState() {
+    super.initState();
+    textController = quill.QuillController.basic();
+    images = [];
+    _initializeContent();
+  }
+
+  @override
+  void didUpdateWidget(NoteThumb oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.note.content != widget.note.content) {
+      images = [];
+      _initializeContent();
+    }
+  }
+
+  void _initializeContent() {
+    for (var d in widget.note.content) {
       switch (d['type']) {
         case 'quill':
-          var textController = quill.QuillController.basic();
           textController.document = quill.Document.fromJson(d['value']);
           textController.readOnly = true;
-          var quillWg = quill.QuillEditor.basic(
-            controller: textController,
-            config: const quill.QuillEditorConfig(
-              scrollable: true,
-              autoFocus: false,
-              expands: false,
-              padding: EdgeInsets.zero,
-            ),
-          );
-          quillWidgets = quillWg;
           break;
         case 'image':
           images.add(base64.decode(d['value']));
           break;
-        default:
-          throw 'Not Support Datatype${d['type']}';
       }
     }
-    Widget medias = const SizedBox(
-      height: 0,
-      width: 0,
-    );
+  }
+
+  @override
+  void dispose() {
+    textController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var appState = context.watch<SNoteAppState>();
+
+    Widget medias = const SizedBox(height: 0, width: 0);
     if (images.isNotEmpty) {
-      medias = Container(
+      medias = Positioned(
+        bottom: 0,
+        left: 0,
+        right: 0,
         height: 50,
-        alignment: Alignment.bottomLeft,
-        margin: const EdgeInsets.fromLTRB(0, 50, 0, 0),
         child: ListView.builder(
-            itemCount: images.length,
-            scrollDirection: Axis.horizontal,
-            itemBuilder: (BuildContext context, int index) {
-              return Image.memory(images[index]);
-            }),
+          itemCount: images.length,
+          scrollDirection: Axis.horizontal,
+          itemBuilder: (BuildContext context, int index) {
+            return Image.memory(
+              images[index],
+              cacheHeight: 50,
+            );
+          },
+        ),
       );
     }
+
     return GestureDetector(
       child: Card(
         child: Container(
@@ -442,7 +464,18 @@ class NoteThumb extends StatelessWidget {
           child: AbsorbPointer(
             absorbing: true,
             child: Stack(
-              children: [quillWidgets!, medias],
+              children: [
+                quill.QuillEditor.basic(
+                  controller: textController,
+                  config: const quill.QuillEditorConfig(
+                    scrollable: true,
+                    autoFocus: false,
+                    expands: false,
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+                medias,
+              ],
             ),
           ),
         ),
@@ -453,7 +486,7 @@ class NoteThumb extends StatelessWidget {
           MaterialPageRoute(
             builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
               value: appState,
-              child: NoteEditor(note: note),
+              child: NoteEditor(note: widget.note),
             ),
           ),
         );
@@ -481,19 +514,33 @@ class NoteCards extends StatelessWidget {
     } else {
       noteList = appState.normalNotes;
     }
-    const gridDelegate =
-        SliverSimpleGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 300);
+
     return RefreshIndicator(
-        onRefresh: () async {
-          await appState.fetchNotes(refresh: true);
-        },
-        child: MasonryGridView.builder(
-            itemCount: noteList.length,
-            gridDelegate: gridDelegate,
-            itemBuilder: (context, index) {
-              var note = noteList[index];
-              return NoteThumb(note: note);
-            }));
+      onRefresh: () async {
+        await appState.fetchNotes(refresh: true);
+      },
+      child: CustomScrollView(
+        slivers: [
+          SliverMasonryGrid(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                var note = noteList[index];
+                return RepaintBoundary(
+                  child: NoteThumb(
+                    key: ValueKey(note.id),
+                    note: note,
+                  ),
+                );
+              },
+              childCount: noteList.length,
+            ),
+            gridDelegate: const SliverSimpleGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 300,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
