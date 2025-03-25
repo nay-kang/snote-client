@@ -465,24 +465,39 @@ class _NoteThumbState extends State<NoteThumb> {
         left: 0,
         right: 0,
         height: 50,
-        child: ListView.builder(
-          cacheExtent: 50,
-          itemCount: images.length,
-          scrollDirection: Axis.horizontal,
-          itemBuilder: (BuildContext context, int index) {
-            return ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: 50,
-                maxHeight: 50,
-              ),
-              child: Image.memory(
-                images[index],
-                cacheHeight: 50,
-                cacheWidth: 50,
-                fit: BoxFit.cover,
-              ),
-            );
-          },
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                Colors.grey.withAlpha((0.8 * 255).round()),
+                Colors.transparent,
+              ],
+            ),
+          ),
+          child: ListView.builder(
+            cacheExtent: 50,
+            itemCount: images.length,
+            scrollDirection: Axis.horizontal,
+            itemBuilder: (BuildContext context, int index) {
+              return Padding(
+                padding: const EdgeInsets.all(2),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 50,
+                    maxHeight: 50,
+                  ),
+                  child: Image.memory(
+                    images[index],
+                    cacheHeight: 50,
+                    cacheWidth: 50,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       );
     }
@@ -602,190 +617,207 @@ class NoteCards extends StatelessWidget {
   }
 }
 
-class NoteEditor extends StatelessWidget {
-  NoteEditor({super.key, required this.note});
+class NoteEditor extends StatefulWidget {
   final NoteModel note;
+  const NoteEditor({super.key, required this.note});
 
-  Widget generatePopupMenu(
-      SNoteAppState state, NoteModel note, BuildContext context) {
-    return PopupMenuButton(itemBuilder: (context) {
-      var delBtn = PopupMenuItem(
-        child: const Text('Delete'),
-        onTap: () {
-          state.deleteNote(note).then((_) {
-            Navigator.pop(context);
-          });
-        },
-      );
-      var restoreBtn = PopupMenuItem(
-        child: const Text('Restore'),
-        onTap: () {
-          state.updateContent(note.id, note.content).then((_) {
-            Navigator.pop(context);
-          });
-        },
-      );
-      List<PopupMenuEntry<dynamic>> btns = [];
-      if (note.status == NoteStatus.normal) {
-        btns.addAll([delBtn]);
-      } else if (note.status == NoteStatus.softDelete) {
-        btns.addAll([restoreBtn]);
-      }
-      return btns;
-    });
+  @override
+  State<NoteEditor> createState() => _NoteEditorState();
+}
+
+class _NoteEditorState extends State<NoteEditor> {
+  late quill.QuillController textController;
+  final List<Uint8List> imageData = [];
+  bool _contentChanged = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeContent();
   }
 
-  final List imageData = [];
-  @override
-  Widget build(BuildContext context) {
-    var appState = context.read<SNoteAppState>();
-    appState.currentScreen = 'NoteEditor';
-    var content = note.content;
-    var quillContent;
-    for (var d in content) {
-      switch (d['type']) {
-        case 'quill':
-          quillContent = d['value'];
-          break;
-        case 'image':
-          imageData.add(base64.decode(d['value']));
-          break;
-        default:
-          throw 'not support type:${d['type']}';
-      }
-    }
-    final textController = quill.QuillController.basic();
+  void _initializeContent() {
+    // Initialize text controller
+    var quillContent = widget.note.content.firstWhere(
+      (d) => d['type'] == 'quill',
+      orElse: () => {'value': []},
+    )['value'];
+    textController = quill.QuillController.basic();
     textController.document = quill.Document.fromJson(quillContent);
     textController.moveCursorToEnd();
 
-    Function? addImage;
-    var imageBtn = quill.QuillToolbarCustomButtonOptions(
-      icon: const Icon(Icons.image),
-      tooltip: 'upload image',
-      onPressed: () async {
-        var result = await FilePicker.platform.pickFiles(
-            type: FileType.image, allowMultiple: false, withData: true);
-        var imageBytes = result?.files.single.bytes;
-        imageBytes = await compressImage(imageBytes!);
-        addImage!(imageBytes);
-      },
+    // Initialize images
+    for (var d in widget.note.content) {
+      if (d['type'] == 'image') {
+        imageData.add(base64.decode(d['value']));
+      }
+    }
+
+    // Listen for content changes
+    textController.addListener(() {
+      _contentChanged = true;
+    });
+  }
+
+  Future<void> _saveContent() async {
+    if (!_contentChanged) return;
+
+    List<Map<String, dynamic>> content = [
+      {'type': 'quill', 'value': textController.document.toDelta().toJson()},
+      ...imageData.map((img) => {"type": 'image', "value": base64.encode(img)})
+    ];
+
+    await context.read<SNoteAppState>().updateContent(widget.note.id, content);
+    _contentChanged = false;
+  }
+
+  Future<void> _addImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: true,
+      compressionQuality: 0,
     );
 
+    if (result?.files.single.bytes != null) {
+      final compressed = await compressImage(result!.files.single.bytes!);
+      setState(() {
+        imageData.add(compressed);
+        _contentChanged = true;
+      });
+    }
+  }
+
+  void _deleteImage(Uint8List image) {
+    setState(() {
+      imageData.remove(image);
+      _contentChanged = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 40,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_rounded,
-          ),
-          alignment: Alignment.centerLeft,
+          icon: const Icon(Icons.arrow_back_ios_rounded),
           iconSize: 20,
-          onPressed: () {
-            List<dynamic> content = [];
-            content.add({
-              'type': 'quill',
-              'value': textController.document.toDelta().toJson()
-            });
-            for (var img in imageData) {
-              content.add({"type": 'image', "value": base64.encode(img)});
-            }
-            appState.updateContent(note.id, content).then((_) {
-              appState.currentScreen = 'SNoteHome';
-              Navigator.pop(context);
-            });
+          onPressed: () async {
+            await _saveContent();
+            Navigator.pop(context);
           },
         ),
+        actions: [
+          PopupMenuButton(
+            itemBuilder: (context) => [
+              if (widget.note.status == NoteStatus.normal)
+                PopupMenuItem(
+                  child: const Text('Delete'),
+                  onTap: () async {
+                    await context.read<SNoteAppState>().deleteNote(widget.note);
+                    Navigator.pop(context);
+                  },
+                ),
+              if (widget.note.status == NoteStatus.softDelete)
+                PopupMenuItem(
+                  child: const Text('Restore'),
+                  onTap: () async {
+                    await _saveContent();
+                    Navigator.pop(context);
+                  },
+                ),
+            ],
+          ),
+        ],
       ),
-      body: Column(children: [
-        Expanded(
+      body: Column(
+        children: [
+          Expanded(
             child: Container(
-                margin: const EdgeInsets.fromLTRB(18, 10, 18, 10),
-                child: quill.QuillEditor.basic(
-                  controller: textController,
-                  config: const quill.QuillEditorConfig(),
-                ))),
-
-        //using statefulbuilder to keep text unchanged while update image change
-        StatefulBuilder(
-          builder: ((context, setState) {
-            addImage = (Uint8List imageBytes) {
-              setState(() {
-                imageData.add(imageBytes);
-              });
-            };
-            void deleteImage(Uint8List imageBytes) {
-              setState(() {
-                imageData.remove(imageBytes);
-              });
-            }
-
-            return SizedBox(
-                height: imageData.isEmpty ? 0 : 100,
-                child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: imageData.length,
-                    itemBuilder: (context, index) {
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => ImageViewer(
-                                      imageData[index], deleteImage)));
-                        },
-                        child: Image.memory(imageData[index]),
-                      );
-                    }));
-          }),
-        ),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            quill.QuillSimpleToolbar(
+              margin: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+              child: quill.QuillEditor.basic(
                 controller: textController,
-                config: quill.QuillSimpleToolbarConfig(
-                    customButtons: [imageBtn],
-                    showListBullets: true,
-                    showListCheck: true,
-                    showAlignmentButtons: false,
-                    showBackgroundColorButton: false,
-                    showBoldButton: false,
-                    showCenterAlignment: false,
-                    showClearFormat: false,
-                    showCodeBlock: false,
-                    showColorButton: false,
-                    showDirection: false,
-                    showDividers: false,
-                    showFontFamily: false,
-                    showFontSize: false,
-                    showHeaderStyle: false,
-                    showIndent: false,
-                    showInlineCode: false,
-                    showItalicButton: false,
-                    showJustifyAlignment: false,
-                    showLeftAlignment: false,
-                    showLink: false,
-                    showListNumbers: false,
-                    showQuote: false,
-                    showRedo: true,
-                    showRightAlignment: false,
-                    showSearchButton: false,
-                    showSmallButton: false,
-                    showStrikeThrough: false,
-                    showUnderLineButton: false,
-                    showUndo: true,
-                    showSubscript: false,
-                    showSuperscript: false,
-                    showClipboardCopy: false,
-                    showClipboardCut: false,
-                    showClipboardPaste: false,
-                    showLineHeightButton: false)),
-            generatePopupMenu(appState, note, context)
-          ],
-        ),
-      ]),
+                config: const quill.QuillEditorConfig(),
+              ),
+            ),
+          ),
+          if (imageData.isNotEmpty)
+            SizedBox(
+              height: 100,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: imageData.length,
+                itemBuilder: (context, index) => GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ImageViewer(
+                        imageData[index],
+                        _deleteImage,
+                      ),
+                    ),
+                  ),
+                  child: Image.memory(imageData[index]),
+                ),
+              ),
+            ),
+          quill.QuillSimpleToolbar(
+            controller: textController,
+            config: quill.QuillSimpleToolbarConfig(
+              customButtons: [
+                quill.QuillToolbarCustomButtonOptions(
+                  icon: const Icon(Icons.image),
+                  tooltip: 'Upload image',
+                  onPressed: _addImage,
+                ),
+              ],
+              showListBullets: true,
+              showListCheck: true,
+              showAlignmentButtons: false,
+              showBackgroundColorButton: false,
+              showBoldButton: false,
+              showCenterAlignment: false,
+              showClearFormat: false,
+              showCodeBlock: false,
+              showColorButton: false,
+              showDirection: false,
+              showDividers: false,
+              showFontFamily: false,
+              showFontSize: false,
+              showHeaderStyle: false,
+              showIndent: false,
+              showInlineCode: false,
+              showItalicButton: false,
+              showJustifyAlignment: false,
+              showLeftAlignment: false,
+              showLink: false,
+              showListNumbers: false,
+              showQuote: false,
+              showRedo: true,
+              showRightAlignment: false,
+              showSearchButton: false,
+              showSmallButton: false,
+              showStrikeThrough: false,
+              showUnderLineButton: false,
+              showUndo: true,
+              showSubscript: false,
+              showSuperscript: false,
+              showClipboardCopy: false,
+              showClipboardCut: false,
+              showClipboardPaste: false,
+              showLineHeightButton: false,
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  @override
+  void dispose() {
+    textController.dispose();
+    super.dispose();
   }
 }
 
