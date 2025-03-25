@@ -318,7 +318,7 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
 }
 
 class HttpClient extends http.BaseClient {
-  late final http.Client _inner;
+  late http.Client _inner;
   final onLoading = StreamController<bool>();
   HttpClient._() {
     _inner = http.Client();
@@ -355,22 +355,36 @@ class HttpClient extends http.BaseClient {
   }
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (!kIsWeb) {
       request.headers['User-Agent'] = userAgent;
     }
     logger.i('start request ${request.url}');
     onLoading.add(true);
-
-    try {
-      return _inner.send(request).then((response) async {
+    int attempts = 0;
+    while (true) {
+      try {
+        var response = await _inner.send(request);
         onLoading.add(false);
         return response;
-      });
-    } catch (e) {
-      onLoading.add(false);
-      logger.e("error on request ${request.url}: $e");
-      rethrow;
+      } on SocketException catch (e) {
+        attempts++;
+        logger.e("SocketException on request ${request.url}: $e");
+        if (attempts >= 3) {
+          onLoading.add(false);
+          rethrow;
+        }
+        try {
+          _inner.close();
+        } catch (_) {}
+
+        _inner = http.Client();
+        await Future.delayed(const Duration(seconds: 2));
+      } catch (e) {
+        onLoading.add(false);
+        logger.e("error on request ${request.url}: $e");
+        rethrow;
+      }
     }
   }
 }
