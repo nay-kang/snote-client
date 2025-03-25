@@ -549,10 +549,6 @@ class NoteService {
           (value) {
             logger.w('websocket closed!');
             rpcClient = null;
-            // Try to reconnect after connection lost
-            Future.delayed(const Duration(seconds: 2), () {
-              getRpcClient();
-            });
           },
         );
 
@@ -583,10 +579,7 @@ class NoteService {
       } catch (e) {
         logger.e('WebSocket connection error: $e');
         rpcClient = null;
-        // Try to reconnect after error
-        Future.delayed(const Duration(seconds: 2), () {
-          getRpcClient();
-        });
+        rethrow;
       }
     }
     return rpcClient!;

@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:firebase_core/firebase_core.dart';
@@ -26,17 +27,18 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
+  var _logger = Logger();
   WidgetsFlutterBinding.ensureInitialized();
   AuthManager.getInstance(); // Initialize AuthManager
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FlutterError.onError = (errorDetails) {
-    logger.e(errorDetails.exceptionAsString(), stackTrace: errorDetails.stack);
+    _logger.e(errorDetails.exceptionAsString(), stackTrace: errorDetails.stack);
     showErrorMessage(errorDetails.exceptionAsString());
     FirebaseCrashlytics.instance.recordFlutterError(errorDetails);
   };
   // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
   PlatformDispatcher.instance.onError = (error, stack) {
-    logger.e(error, stackTrace: stack);
+    _logger.e(error, stackTrace: stack);
     showErrorMessage(error.toString());
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
