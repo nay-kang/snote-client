@@ -16,6 +16,7 @@ import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:libsimple_flutter/libsimple_flutter.dart';
 import 'package:archive/archive.dart';
 import 'auth.dart';
+import 'package:synchronized/synchronized.dart';
 
 var logger = Slogger();
 
@@ -42,6 +43,10 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && currentScreen == 'SNoteHome') {
       fetchNotes();
+    }
+    // make sure websocket is connected
+    if (state == AppLifecycleState.resumed && noteService != null) {
+      noteService!.getRpcClient();
     }
   }
 
@@ -155,7 +160,7 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
 
   Uint8List? mainAesKey;
   late FlutterSecureStorage seStorage;
-  Future<void> checkAesKey() async {
+  Future<void> initializeNoteServiceAndKeys() async {
     if (userSession == null || userSession!.isAuthenticated == false) {
       return;
     }
@@ -535,54 +540,60 @@ class NoteService {
   }
 
   jrpc.Peer? rpcClient;
+  final _rpcLock = Lock(); // Add a lock for RPC client creation
+
   Future<jrpc.Client> getRpcClient() async {
-    if (rpcClient == null || rpcClient!.isClosed) {
-      var host = await getHost();
-      host = host.replaceAll('http', 'ws');
-      var uri = Uri.parse("$host/api/ws/");
+    return await _rpcLock.synchronized(() async {
+      if (rpcClient == null || rpcClient!.isClosed) {
+        var host = await getHost();
+        host = host.replaceAll('http', 'ws');
+        var uri = Uri.parse("$host/api/ws/");
 
-      try {
-        var channel = WebSocketChannel.connect(uri);
+        try {
+          var channel = WebSocketChannel.connect(uri);
 
-        rpcClient = jrpc.Peer(channel.cast<String>());
-        rpcClient!.done.then(
-          (value) {
-            logger.w('websocket closed!');
-            rpcClient = null;
-          },
-        );
+          rpcClient = jrpc.Peer(channel.cast<String>());
+          rpcClient!.done.then(
+            (value) {
+              logger.w('websocket closed!');
+              rpcClient = null;
+            },
+          );
 
-        unawaited(rpcClient!.listen());
-        await tokenFuture.future;
-        var _ = await rpcClient!.sendRequest('auth', {'token': token});
+          unawaited(rpcClient!.listen());
+          await tokenFuture.future;
+          await rpcClient!.sendRequest('auth', {'token': token});
 
-        rpcClient!.registerMethod('aeskeyCodeGenerate',
-            (jrpc.Parameters params) {
-          aesKeyCodeCallback();
-        });
-
-        rpcClient!.registerMethod('aeskeyCodeVerify', (jrpc.Parameters params) {
-          var code = params['code'].asString;
-          var fromClient = params['from'].asString;
-          aesKeyCodeVerifyCallback(code, fromClient);
-        });
-
-        rpcClient!.registerMethod('messageFromClient',
-            (jrpc.Parameters params) {
-          messageFromClient(
-              params['from'].asString, params['message'].asString);
-        });
-
-        rpcClient!.registerMethod('noteUpdated', (jrpc.Parameters params) {
-          noteUpdatedCallback(params['eventAt'].asString);
-        });
-      } catch (e) {
-        logger.e('WebSocket connection error: $e');
-        rpcClient = null;
-        rethrow;
+          _registerRpcMethods();
+        } catch (e, stack) {
+          logger.e('WebSocket connection error: $e', stackTrace: stack);
+          rpcClient = null;
+          rethrow;
+        }
       }
-    }
-    return rpcClient!;
+      return rpcClient!;
+    });
+  }
+
+  // Add this helper method to organize method registration:
+  void _registerRpcMethods() {
+    rpcClient!.registerMethod('aeskeyCodeGenerate', (jrpc.Parameters params) {
+      aesKeyCodeCallback();
+    });
+
+    rpcClient!.registerMethod('aeskeyCodeVerify', (jrpc.Parameters params) {
+      var code = params['code'].asString;
+      var fromClient = params['from'].asString;
+      aesKeyCodeVerifyCallback(code, fromClient);
+    });
+
+    rpcClient!.registerMethod('messageFromClient', (jrpc.Parameters params) {
+      messageFromClient(params['from'].asString, params['message'].asString);
+    });
+
+    rpcClient!.registerMethod('noteUpdated', (jrpc.Parameters params) {
+      noteUpdatedCallback(params['eventAt'].asString);
+    });
   }
 
   prepareKeyExchange() async {

@@ -236,7 +236,7 @@ class _SNoteMainState extends State<SNoteMain> {
           },
         );
       });
-      appState.checkAesKey();
+      appState.initializeNoteServiceAndKeys();
       _listenersRegistered = true;
     }
   }
@@ -890,7 +890,7 @@ class _KeyExchangePopState extends State<KeyExchangePop> {
     final appState = Provider.of<SNoteAppState>(context, listen: false);
     appState.prepareKeyExchange();
     _subscription = appState.listenForAesKeyExchangeDone(() {
-      appState.checkAesKey();
+      appState.initializeNoteServiceAndKeys();
       Navigator.pop(context);
     });
   }
