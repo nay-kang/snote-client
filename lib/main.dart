@@ -659,6 +659,7 @@ class _NoteEditorState extends State<NoteEditor> {
     textController.addListener(() {
       _contentChanged = true;
     });
+    context.read<SNoteAppState>().currentScreen = 'NoteEditor';
   }
 
   Future<void> _saveContent() async {

@@ -124,3 +124,7 @@ enum NoteStatus {
 I want show a global loading bar on top of screen when there has http request.but after google search and some ask GPT.there is no perfect answer.
 And I can not understand widgets and navigator.which means I write the loading bar in a parent widget.but when I navigator out,then the loading bar will not work.
 at last using Overlay to figure it out.
+
+2025-04-08
+flutter rich text input has problem with chrome."https://flutter.github.io/samples/web/simplistic_editor/" in this example when put massive text and then select text.the selected area is wrong.this happened on both linux and windows.
+and linux chrome has input method posistion problem.that the input method widget float far away from the focus position when chrome not align left of the screen.
