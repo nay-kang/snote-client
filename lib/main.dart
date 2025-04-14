@@ -669,8 +669,10 @@ class _NoteEditorState extends State<NoteEditor> {
       {'type': 'quill', 'value': textController.document.toDelta().toJson()},
       ...imageData.map((img) => {"type": 'image', "value": base64.encode(img)})
     ];
-
-    await context.read<SNoteAppState>().updateContent(widget.note.id, content);
+    final appState = context.read<SNoteAppState>();
+    await appState.updateContent(widget.note.id, content).then((_) {
+      appState.currentScreen = 'SNoteHome';
+    });
     _contentChanged = false;
   }
 

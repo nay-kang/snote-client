@@ -104,7 +104,7 @@ class Config {
     var client = http.Client();
     await Future.wait(hosts.map((host) async {
       try {
-        var uri = Uri.parse('$host/api/hello/');
+        var uri = Uri.parse('$host/ping');
         var request = http.Request("OPTIONS", uri);
         await client.send(request).timeout(const Duration(seconds: 1));
         logger.d('Host ${uri.host} is available');
