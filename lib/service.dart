@@ -24,7 +24,6 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
   List<NoteModel> normalNotes = [];
   List<NoteModel> trashNotes = [];
   String displayName = '';
-  StreamController<String> tokenStream = StreamController();
   NoteService? noteService;
   AuthState? userSession;
   Completer<StreamController> onLoadingFuture = Completer();
@@ -32,9 +31,6 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
   SNoteAppState() {
     AuthManager.getInstance().authStateChanges.listen((event) {
       userSession = event;
-      if (event.isAuthenticated) {
-        tokenStream.add(event.accessToken!);
-      }
     });
     WidgetsBinding.instance.addObserver(this);
   }
@@ -168,7 +164,6 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
     seStorage = const FlutterSecureStorage();
 
     noteService ??= NoteService(
-      tokenStream,
       _aesKeyCodeCallback!,
       _aesKeyCodeVerifyCallback,
       _messageFromClient,
@@ -396,7 +391,6 @@ class HttpClient extends http.BaseClient {
 
 class NoteService {
   AesGcmSecretKey? _encryptor;
-  StreamController<String> tokenStream;
   Uint8List? aesKey;
   String? host;
   Function aesKeyCodeCallback;
@@ -405,23 +399,11 @@ class NoteService {
   Function noteUpdatedCallback;
   Completer<StreamController> onLoadingFuture = Completer();
   late Future<HttpClient> clientFuture;
-  Completer<bool> tokenFuture = Completer();
-  String token = '';
-  NoteService(
-      this.tokenStream,
-      this.aesKeyCodeCallback,
-      this.aesKeyCodeVerifyCallback,
-      this.messageFromClient,
-      this.noteUpdatedCallback) {
+  NoteService(this.aesKeyCodeCallback, this.aesKeyCodeVerifyCallback,
+      this.messageFromClient, this.noteUpdatedCallback) {
     clientFuture = HttpClient.getInstance();
     clientFuture.then((client) {
       onLoadingFuture.complete(client.onLoading);
-    });
-    tokenStream.stream.listen((event) {
-      if (!tokenFuture.isCompleted) {
-        tokenFuture.complete(true);
-      }
-      token = event;
     });
   }
 
@@ -471,7 +453,7 @@ class NoteService {
   }
 
   Future<Map<String, String>> getHeaders() async {
-    await tokenFuture.future;
+    var token = await AuthManager.getInstance().accessToken;
     return {
       HttpHeaders.authorizationHeader: 'Bearer $token',
       'Content-Type': 'application/json; charset=UTF-8',
@@ -561,7 +543,7 @@ class NoteService {
           );
 
           unawaited(rpcClient!.listen());
-          await tokenFuture.future;
+          var token = await AuthManager.getInstance().accessToken;
           await rpcClient!.sendRequest('auth', {'token': token});
 
           _registerRpcMethods();

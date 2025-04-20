@@ -73,7 +73,17 @@ class AuthManager {
         .timeout(requestTimeout);
   }
 
-  String? get accessToken => _accessToken;
+  Future<String?> _getVerifiedToken() async {
+    if (_accessToken == null) return null;
+
+    final validationResult = await _validateAndRefreshToken(_accessToken!);
+    if (validationResult.$1) {
+      return _accessToken;
+    }
+    return null;
+  }
+
+  Future<String?> get accessToken async => await _getVerifiedToken();
   String? get refreshToken => _refreshToken;
   bool get isAuthenticated => _isAuthenticated;
 
@@ -116,6 +126,7 @@ class AuthManager {
         return (true, JWT.decode(_accessToken!).payload['email'] as String?);
       }
     }
+    await logout(); // Ensure we logout if token is invalid and can't be refreshed
     return (false, null);
   }
 
