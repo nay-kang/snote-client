@@ -519,7 +519,7 @@ class _NoteThumbState extends State<NoteThumb> {
         },
         child: Card(
           child: Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
             constraints: const BoxConstraints(maxHeight: 300),
             child: Stack(
               children: [
@@ -725,11 +725,10 @@ class _NoteEditorState extends State<NoteEditor> {
       body: Column(
         children: [
           Expanded(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(18, 10, 18, 10),
-              child: quill.QuillEditor.basic(
-                controller: textController,
-                config: const quill.QuillEditorConfig(),
+            child: quill.QuillEditor.basic(
+              controller: textController,
+              config: const quill.QuillEditorConfig(
+                padding: EdgeInsets.all(18),
               ),
             ),
           ),
