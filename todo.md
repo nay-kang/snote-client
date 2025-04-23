@@ -25,7 +25,7 @@ add loading after fill login code
 fix search showing bug after refactor the layout code {cm:2024-03-08}
 trigger update after the app resume {cm:2024-03-08}
 pause auto update while in edit page,on update while in list page {cm:2025-03-13}
-bug: failed to update list after save edit sometimes
+bug: failed to update list after save edit sometimes {cm:2025-04-22}
 feature: in edit page search
 feature: auto save when in edit page
 feature: redo able {cm:2025-03-21}
@@ -35,3 +35,4 @@ bug: DNS lookup failed error when network changed {cm:2025-03-21}
 bug: bad element sometime when saving new note {cm:2025-03-21}
 bug: long time run in background the auth token can not refresh. {cm:2025-04-20}
 bug: after update note,return to main page, the layout go to wrong and can not scroll down.
+bug: mouse hover on html widget will show scrollbar.try to hide that

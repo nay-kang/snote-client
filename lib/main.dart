@@ -487,13 +487,11 @@ class _NoteThumbState extends State<NoteThumb> {
                 padding: const EdgeInsets.all(2),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(
-                    maxWidth: 50,
-                    maxHeight: 50,
+                    maxHeight: 46,
                   ),
                   child: Image.memory(
                     images[index],
-                    cacheHeight: 50,
-                    cacheWidth: 50,
+                    cacheHeight: 46,
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -527,32 +525,30 @@ class _NoteThumbState extends State<NoteThumb> {
               children: [
                 // Use HTML instead of QuillEditor
                 SingleChildScrollView(
-                  physics:
-                      const NeverScrollableScrollPhysics(), // Disable scrolling
-                  padding: EdgeInsets.zero, // Remove padding
-                  // Add key to force HTML widget rebuild
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
                   key: ValueKey(
                       '${widget.note.id}_${widget.note.content.hashCode}'),
-                  child: Html(
-                    data: htmlContent,
-                    style: {
-                      "html": Style(
-                        margin: Margins.zero,
-                        padding: HtmlPaddings.zero,
-                      ),
-                      "body": Style(
-                        margin: Margins.zero,
-                        padding: HtmlPaddings.zero,
-                        fontSize: FontSize(14),
-                        maxLines: 15,
-                        textOverflow: TextOverflow.ellipsis,
-                      ),
-                      "p": Style(
-                        margin: Margins.zero,
-                        padding: HtmlPaddings.zero,
-                      ),
-                    },
-                    shrinkWrap: true, // Ensure content takes minimum space
+                  child: ScrollConfiguration(
+                    behavior: NoScrollbarScrollBehavior(),
+                    child: Html(
+                      data: htmlContent,
+                      style: {
+                        "html": Style(
+                          margin: Margins.zero,
+                          padding: HtmlPaddings.zero,
+                        ),
+                        "body": Style(
+                            margin: Margins.zero,
+                            padding: HtmlPaddings.zero,
+                            fontSize: FontSize(14)),
+                        "p": Style(
+                          margin: Margins.zero,
+                          padding: HtmlPaddings.zero,
+                        ),
+                      },
+                      shrinkWrap: true,
+                    ),
                   ),
                 ),
                 medias,
@@ -586,33 +582,23 @@ class NoteCards extends StatelessWidget {
     }
 
     return SafeArea(
-      // Add SafeArea widget
       child: RefreshIndicator(
         onRefresh: () async {
           await appState.fetchNotes(refresh: true);
         },
-        child: CustomScrollView(
-          slivers: [
-            SliverMasonryGrid(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  var note = noteList[index];
-                  return RepaintBoundary(
-                    key: ValueKey(note
-                        .id), // Ensure each RepaintBoundary has a unique key
-                    child: NoteThumb(
-                      note: note,
-                    ),
-                  );
-                },
-                childCount: noteList.length,
-              ),
-              gridDelegate:
-                  const SliverSimpleGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 300,
-              ),
-            ),
-          ],
+        child: MasonryGridView.builder(
+          itemCount: noteList.length,
+          cacheExtent: 500,
+          itemBuilder: (context, index) {
+            var note = noteList[index];
+            return NoteThumb(
+              // key: ValueKey(note.id), // add key will cause problem when notethumb reorder
+              note: note,
+            );
+          },
+          gridDelegate: const SliverSimpleGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 300,
+          ),
         ),
       ),
     );
@@ -1091,5 +1077,14 @@ class NoteSearch extends SearchDelegate {
       // showResults(context);
     });
     return showFutureResult(completer.future);
+  }
+}
+
+// Add this class to your file
+class NoScrollbarScrollBehavior extends ScrollBehavior {
+  @override
+  Widget buildScrollbar(
+      BuildContext context, Widget child, ScrollableDetails details) {
+    return child; // Never build a scrollbar
   }
 }
