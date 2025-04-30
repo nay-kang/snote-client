@@ -36,3 +36,4 @@ bug: bad element sometime when saving new note {cm:2025-03-21}
 bug: long time run in background the auth token can not refresh. {cm:2025-04-20}
 bug: after update note,return to main page, the layout go to wrong and can not scroll down.
 bug: mouse hover on html widget will show scrollbar.try to hide that
+bug: prevent fetchNotes be called when aeskey not assigned
