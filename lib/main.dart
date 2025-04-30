@@ -48,18 +48,21 @@ Future<void> main() async {
 }
 
 void showErrorMessage(String error) {
-  scaffoldMessengerKey.currentState?.showSnackBar(
-    SnackBar(
-      content: Text(error),
-      duration: const Duration(milliseconds: 3000),
-      margin: const EdgeInsets.fromLTRB(15, 0, 15, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10.0),
+  // Schedule the SnackBar to be shown after the current build phase
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(error),
+        duration: const Duration(milliseconds: 3000),
+        margin: const EdgeInsets.fromLTRB(15, 0, 15, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10.0),
+        ),
       ),
-    ),
-  );
+    );
+  });
 }
 
 class GlobalLoadingIndicatorWidget {
@@ -870,14 +873,12 @@ class KeyExchangePop extends StatefulWidget {
 }
 
 class _KeyExchangePopState extends State<KeyExchangePop> {
-  late final StreamSubscription _subscription;
-
   @override
   void initState() {
     super.initState();
     final appState = Provider.of<SNoteAppState>(context, listen: false);
     appState.prepareKeyExchange();
-    _subscription = appState.listenForAesKeyExchangeDone(() {
+    appState.listenForAesKeyExchangeDone(() {
       appState.initializeNoteServiceAndKeys();
       Navigator.pop(context);
     });
@@ -885,7 +886,6 @@ class _KeyExchangePopState extends State<KeyExchangePop> {
 
   @override
   void dispose() {
-    _subscription.cancel();
     super.dispose();
   }
 
