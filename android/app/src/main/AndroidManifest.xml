@@ -3,7 +3,7 @@
    <application
         android:label="snote"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher" tools:replace="android:label">
+        android:icon="@mipmap/launcher_icon" tools:replace="android:label">
         <activity
             android:name=".MainActivity"
             android:exported="true"
