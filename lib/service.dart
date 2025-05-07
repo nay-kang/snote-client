@@ -367,9 +367,9 @@ class HttpClient extends http.BaseClient {
         var response = await _inner.send(request);
         onLoading.add(false);
         return response;
-      } on SocketException catch (e) {
+      } catch (e) {
         attempts++;
-        logger.e("SocketException on request ${request.url}: $e");
+        logger.e("Exception on request ${request.url}: $e");
         if (attempts >= 3) {
           onLoading.add(false);
           rethrow;
@@ -380,10 +380,6 @@ class HttpClient extends http.BaseClient {
 
         _inner = http.Client();
         await Future.delayed(const Duration(seconds: 2));
-      } catch (e) {
-        onLoading.add(false);
-        logger.e("error on request ${request.url}: $e");
-        rethrow;
       }
     }
   }
