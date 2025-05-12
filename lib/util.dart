@@ -16,7 +16,12 @@ class Slogger extends Logger {
       {DateTime? time, Object? error, StackTrace? stackTrace}) {
     if (!kIsWeb && level.index >= Level.warning.index) {
       try {
-        FirebaseCrashlytics.instance.log("$time:$level:$message");
+        if (error != null) {
+          FirebaseCrashlytics.instance.recordError(error, stackTrace);
+        } else {
+          FirebaseCrashlytics.instance
+              .log("$level:$message\n${stackTrace?.toString()}");
+        }
       } catch (e) {
         debugPrint("log to firebase crashlytics failed:$e");
       }
