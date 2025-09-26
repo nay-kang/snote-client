@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
+import 'package:file_saver/file_saver.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -21,6 +22,7 @@ import 'auth.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:vsc_quill_delta_to_html/vsc_quill_delta_to_html.dart';
+import 'package:intl/intl.dart';
 
 var logger = Slogger();
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
@@ -347,6 +349,40 @@ class MainDrawer extends StatelessWidget {
           onTap: () {
             logger.d('devices button tapped');
             throw Exception();
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.archive),
+          title: const Text('Export'),
+          onTap: () async {
+            GlobalLoadingIndicatorWidget().show(context);
+            try {
+              String exportContent = "";
+              for (var note in appState.normalNotes) {
+                exportContent += "${jsonEncode({
+                      "id": note.id,
+                      "content": note.content,
+                      "update_at":
+                          DateFormat('yyyy-MM-dd HH:mm').format(note.updatedAt!)
+                    })}\n";
+              }
+              logger.d("export button tapped");
+              final fileName =
+                  "notes-${DateFormat('yyyy-MM-dd-HH-mm').format(DateTime.now())}";
+              await FileSaver.instance.saveFile(
+                  name: fileName,
+                  bytes: utf8.encode(exportContent),
+                  fileExtension: "jl",
+                  mimeType: MimeType.text);
+              scaffoldMessengerKey.currentState?.showSnackBar(const SnackBar(
+                content: Text("Notes exported successfully"),
+                duration: Duration(seconds: 2),
+              ));
+            } catch (e) {
+              showErrorMessage("Export failed: $e");
+            } finally {
+              GlobalLoadingIndicatorWidget().hide();
+            }
           },
         ),
         ListTile(
