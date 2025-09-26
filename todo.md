@@ -38,6 +38,6 @@ bug: after update note,return to main page, the layout go to wrong and can not s
 bug: mouse hover on html widget will show scrollbar.try to hide that
 bug: prevent fetchNotes be called when aeskey not assigned
 feature: export all notes {cm:2025-09-26}
-feature: auto scroll to top after saving note
+feature: auto scroll to top after saving note {cm:2025-09-26}
 feature: automatic backgroud saving
 feature: prevent logout when face network issue

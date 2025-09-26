@@ -172,6 +172,7 @@ class _NoteThumbState extends State<NoteThumb> {
 }
 
 class NoteCards extends StatelessWidget {
+  static final ScrollController scrollController = ScrollController();
   final List<NoteModel>? searchResult;
   final NoteListType listType;
   const NoteCards(
@@ -195,6 +196,7 @@ class NoteCards extends StatelessWidget {
           await appState.fetchNotes(refresh: true);
         },
         child: MasonryGridView.builder(
+          controller: scrollController,
           itemCount: noteList.length,
           cacheExtent: 500,
           itemBuilder: (context, index) {
@@ -266,6 +268,11 @@ class _NoteEditorState extends State<NoteEditor> {
     final appState = context.read<SNoteAppState>();
     await appState.updateContent(widget.note.id, content).then((_) {
       appState.currentScreen = 'SNoteHome';
+      NoteCards.scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     });
     _contentChanged = false;
   }
