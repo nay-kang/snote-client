@@ -52,15 +52,15 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
   }
 
-  listenForAesKeyRequire(Function aesKeyRequireCallback) {
+  void listenForAesKeyRequire(Function aesKeyRequireCallback) {
     _aesKeyRequireCallback = aesKeyRequireCallback;
   }
 
-  listenForAesKeyCodeGenerate(Function aesKeyCodeCallback) {
+  void listenForAesKeyCodeGenerate(Function aesKeyCodeCallback) {
     _aesKeyCodeCallback = aesKeyCodeCallback;
   }
 
-  listenForAesKeyExchangeDone(Function callback) {
+  void listenForAesKeyExchangeDone(Function callback) {
     _aesKeyExchangeDoneCallback = callback;
   }
 
@@ -71,7 +71,7 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
   Map<String, dynamic>? _pubTempKey;
   Map<String, dynamic>? _privateTempKey;
   Uint8List? _tempEncryptKey;
-  _aesKeyCodeVerifyCallback(String code, String from) async {
+  Future<void> _aesKeyCodeVerifyCallback(String code, String from) async {
     if (code != this.code) {
       logger.w('code not match');
       return;
@@ -83,7 +83,7 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
     noteService!.sendToClient(from, json.encode(data));
   }
 
-  _messageFromClient(String from, String message) async {
+  Future<void> _messageFromClient(String from, String message) async {
     // https://getstream.io/blog/end-to-end-encrypted-chat-in-flutter/
     var inData = json.decode(message);
     switch (inData['type']) {
@@ -300,7 +300,7 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   late String code;
-  setAesExchangeCode(String code) {
+  void setAesExchangeCode(String code) {
     this.code = code;
   }
 
@@ -456,7 +456,7 @@ class NoteService {
     };
   }
 
-  Future<int> registClient(clientId) async {
+  Future<int> registClient(String clientId) async {
     var host = await getHost();
     var headers = await getHeaders();
     var client = await clientFuture;
@@ -574,17 +574,17 @@ class NoteService {
     });
   }
 
-  prepareKeyExchange() async {
+  Future<void> prepareKeyExchange() async {
     var client = await getRpcClient();
     var _ = await client.sendRequest('prepareKeyExchange');
   }
 
-  verifyAesExchangeCode(String code) async {
+  Future<void> verifyAesExchangeCode(String code) async {
     var client = await getRpcClient();
     var _ = await client.sendRequest('verifyAesExchangeCode', {'code': code});
   }
 
-  sendToClient(String to, String message) async {
+  Future<void> sendToClient(String to, String message) async {
     var client = await getRpcClient();
     var _ = await client
         .sendRequest('sendToClient', {'to': to, 'message': message});
@@ -756,7 +756,7 @@ class NoteDB {
   }
 
   var dbInited = false;
-  initDb(Sqlite _db) async {
+  Future<void> initDb(Sqlite _db) async {
     if (dbInited) {
       return;
     }
@@ -779,3 +779,5 @@ class NoteDB {
     dbInited = true;
   }
 }
+
+enum NoteListType { normal, trash }

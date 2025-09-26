@@ -89,7 +89,9 @@ class OtpCodeInput extends StatelessWidget {
     )
         .then((res) {
       if (res) {
-        Navigator.of(context).pop();
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
       }
     });
   }
