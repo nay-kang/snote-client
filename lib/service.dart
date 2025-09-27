@@ -218,7 +218,7 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
     }
     var lastTimestamp = await db.getLastUpdatedAt();
     var remoteNotes = await noteService!.loadNotesHttp(lastTimestamp);
-    var mergedNotes = updateLocalNotes(localNotes, remoteNotes);
+    var mergedNotes = await updateLocalNotes(localNotes, remoteNotes);
     seperatedNotes = trashNoteSeperate(mergedNotes);
     normalNotes.clear();
     normalNotes.addAll(seperatedNotes['normalNotes']!);
@@ -240,14 +240,14 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
     return {'normalNotes': nNotes, 'trashNotes': tNotes};
   }
 
-  List<NoteModel> updateLocalNotes(
-      List<NoteModel> local, List<NoteModel> remote) {
+  Future<List<NoteModel>> updateLocalNotes(
+      List<NoteModel> local, List<NoteModel> remote) async {
     var db = NoteDB();
     for (var note in remote.reversed) {
       if (note.status == NoteStatus.hardDelete) {
-        db.delete(note.id);
+        await db.delete(note.id);
       } else {
-        db.save(note);
+        await db.save(note);
       }
       int index = local.indexWhere((element) => element.id == note.id);
       if (index > -1) {
@@ -689,26 +689,35 @@ class NoteDB {
     return notes;
   }
 
+  /// without lock will cause wired things.
+  /// when call multiple save in a loop without await, only first insert sql will be executed all.
+  /// subsequent delete and insert sql will be only executed the last one and after all first insert sql executed.
+  final dbExecLock = Lock();
   Future<void> save(NoteModel note) async {
-    var _db = await getDb();
-    var content = jsonEncode(note.content);
-    var searchContent = extractQuillText(note.content);
-    var createdAt = note.createdAt?.millisecondsSinceEpoch;
-    var updatedAt = note.updatedAt?.millisecondsSinceEpoch;
-    var sql =
-        "insert or replace into note(id,content,created_at,updated_at,status) values(?,?,?,?,?);";
-    await _db
-        .exec(sql, [note.id, content, createdAt, updatedAt, note.status.value]);
-    sql = " delete from note_search where note_id=? ";
-    await _db.exec(sql, [note.id]);
-    sql = " insert into note_search values(?,?) ";
-    await _db.exec(sql, [note.id, searchContent]);
+    await dbExecLock.synchronized(() async {
+      var _db = await getDb();
+      var content = jsonEncode(note.content);
+      var searchContent = extractQuillText(note.content);
+      var createdAt = note.createdAt?.millisecondsSinceEpoch;
+      var updatedAt = note.updatedAt?.millisecondsSinceEpoch;
+      var sql =
+          "insert or replace into note(id,content,created_at,updated_at,status) values(?,?,?,?,?);";
+      await _db.exec(
+          sql, [note.id, content, createdAt, updatedAt, note.status.value]);
+      sql = " delete from note_search where note_id=? ";
+      await _db.exec(sql, [note.id]);
+      logger.d("delete note_search for note ${note.id}");
+      sql = " insert into note_search values(?,?) ";
+      await _db.exec(sql, [note.id, searchContent]);
+    });
   }
 
   Future<void> delete(String noteId) async {
-    var _db = await getDb();
-    await _db.exec('delete from note where id=?', [noteId]);
-    await _db.exec('delete from note_search where note_id=?', [noteId]);
+    await dbExecLock.synchronized(() async {
+      var _db = await getDb();
+      await _db.exec('delete from note where id=?', [noteId]);
+      await _db.exec('delete from note_search where note_id=?', [noteId]);
+    });
   }
 
   String extractQuillText(List content) {
@@ -725,10 +734,12 @@ class NoteDB {
   }
 
   Future<void> clear() async {
-    var _db = await getDb();
-    await _db.exec("drop table note");
-    await _db.exec("drop table note_search");
-    dbInited = false;
+    await dbExecLock.synchronized(() async {
+      var _db = await getDb();
+      await _db.exec("drop table note");
+      await _db.exec("drop table note_search");
+      dbInited = false;
+    });
   }
 
   Future<DateTime> getLastUpdatedAt() async {
@@ -757,10 +768,11 @@ class NoteDB {
 
   var dbInited = false;
   Future<void> initDb(Sqlite _db) async {
-    if (dbInited) {
-      return;
-    }
-    await _db.exec('''
+    await dbExecLock.synchronized(() async {
+      if (dbInited) {
+        return;
+      }
+      await _db.exec('''
     create table if not exists note(
       id text primary key,
       content text,
@@ -769,14 +781,15 @@ class NoteDB {
       status int -- 1 means normal,-1 means in trush,
     )
     ''');
-    await _db.exec('''
+      await _db.exec('''
     create virtual table if not exists note_search using fts5(
       note_id,
       content,
       tokenize='simple'
     )
     ''');
-    dbInited = true;
+      dbInited = true;
+    });
   }
 }
 
