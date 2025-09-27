@@ -768,11 +768,10 @@ class NoteDB {
 
   var dbInited = false;
   Future<void> initDb(Sqlite _db) async {
-    await dbExecLock.synchronized(() async {
-      if (dbInited) {
-        return;
-      }
-      await _db.exec('''
+    if (dbInited) {
+      return;
+    }
+    await _db.exec('''
     create table if not exists note(
       id text primary key,
       content text,
@@ -781,15 +780,14 @@ class NoteDB {
       status int -- 1 means normal,-1 means in trush,
     )
     ''');
-      await _db.exec('''
+    await _db.exec('''
     create virtual table if not exists note_search using fts5(
       note_id,
       content,
       tokenize='simple'
     )
     ''');
-      dbInited = true;
-    });
+    dbInited = true;
   }
 }
 
