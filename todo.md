@@ -27,9 +27,8 @@ trigger update after the app resume {cm:2024-03-08}
 pause auto update while in edit page,on update while in list page {cm:2025-03-13}
 bug: failed to update list after save edit sometimes {cm:2025-04-22}
 feature: in edit page search
-feature: auto save when in edit page
 feature: redo able {cm:2025-03-21}
-feature: increase margin in edit page to allow better selection
+feature: increase margin in edit page to allow better selection {cm:2025-11-04}
 feature: display error message {cm:2024-08-29}
 bug: DNS lookup failed error when network changed {cm:2025-03-21}
 bug: bad element sometime when saving new note {cm:2025-03-21}
@@ -39,9 +38,9 @@ bug: mouse hover on html widget will show scrollbar.try to hide that
 bug: prevent fetchNotes be called when aeskey not assigned
 feature: export all notes {cm:2025-09-26}
 feature: auto scroll to top after saving note {cm:2025-09-26}
-feature: automatic backgroud saving
+feature: automatic backgroud saving when in edit page
 feature: prevent logout when face network issue
 feature: purge all note if refresh token expired
 feature: using local tiny GPT to find similar notes to prevent write duplicate note
-bug: add datetime to note view
-bug: every time open snote not update client update time
+bug: add datetime to note view {cm:2025-11-04}
+bug: every time open snote not update client update time {cm:2025-11-04}

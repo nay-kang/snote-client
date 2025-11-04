@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:intl/intl.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:provider/provider.dart';
 import 'package:snote/util.dart';
@@ -96,9 +97,7 @@ class _NoteThumbState extends State<NoteThumb> {
               return Padding(
                 padding: const EdgeInsets.all(2),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxHeight: 46,
-                  ),
+                  constraints: const BoxConstraints(maxHeight: 46),
                   child: Image.memory(
                     images[index],
                     cacheHeight: 46,
@@ -120,10 +119,11 @@ class _NoteThumbState extends State<NoteThumb> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
-                value: appState,
-                child: NoteEditor(note: widget.note),
-              ),
+              builder:
+                  (context) => ChangeNotifierProvider<SNoteAppState>.value(
+                    value: appState,
+                    child: NoteEditor(note: widget.note),
+                  ),
             ),
           );
         },
@@ -138,7 +138,8 @@ class _NoteThumbState extends State<NoteThumb> {
                   physics: const NeverScrollableScrollPhysics(),
                   padding: EdgeInsets.zero,
                   key: ValueKey(
-                      '${widget.note.id}_${widget.note.content.hashCode}'),
+                    '${widget.note.id}_${widget.note.content.hashCode}',
+                  ),
                   child: ScrollConfiguration(
                     behavior: NoScrollbarScrollBehavior(),
                     child: Html(
@@ -149,9 +150,10 @@ class _NoteThumbState extends State<NoteThumb> {
                           padding: HtmlPaddings.zero,
                         ),
                         "body": Style(
-                            margin: Margins.zero,
-                            padding: HtmlPaddings.zero,
-                            fontSize: FontSize(14)),
+                          margin: Margins.zero,
+                          padding: HtmlPaddings.zero,
+                          fontSize: FontSize(14),
+                        ),
                         "p": Style(
                           margin: Margins.zero,
                           padding: HtmlPaddings.zero,
@@ -175,8 +177,11 @@ class NoteCards extends StatelessWidget {
   static final ScrollController scrollController = ScrollController();
   final List<NoteModel>? searchResult;
   final NoteListType listType;
-  const NoteCards(
-      {super.key, this.searchResult, this.listType = NoteListType.normal});
+  const NoteCards({
+    super.key,
+    this.searchResult,
+    this.listType = NoteListType.normal,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -227,6 +232,8 @@ class _NoteEditorState extends State<NoteEditor> {
   late quill.QuillController textController;
   final List<Uint8List> imageData = [];
   bool _contentChanged = false;
+  String updatedAt = '';
+  String createdAt = '';
 
   @override
   void initState() {
@@ -235,11 +242,28 @@ class _NoteEditorState extends State<NoteEditor> {
   }
 
   void _initializeContent() {
+    if (widget.note.updatedAt != null &&
+        widget.note.updatedAt != DateTime.fromMillisecondsSinceEpoch(0)) {
+      updatedAt = DateFormat(
+        'yyyy-MM-dd HH:mm',
+      ).format(widget.note.updatedAt!.toLocal());
+      updatedAt = '$updatedAt last update';
+    }
+
+    if (widget.note.createdAt != null &&
+        widget.note.createdAt != DateTime.fromMillisecondsSinceEpoch(0)) {
+      createdAt = DateFormat(
+        'yyyy-MM-dd HH:mm',
+      ).format(widget.note.createdAt!.toLocal());
+      createdAt = '$createdAt create';
+    }
+
     // Initialize text controller
-    var quillContent = widget.note.content.firstWhere(
-      (d) => d['type'] == 'quill',
-      orElse: () => {'value': []},
-    )['value'];
+    var quillContent =
+        widget.note.content.firstWhere(
+          (d) => d['type'] == 'quill',
+          orElse: () => {'value': []},
+        )['value'];
     textController = quill.QuillController.basic();
     textController.document = quill.Document.fromJson(quillContent);
     textController.moveCursorToEnd();
@@ -263,7 +287,7 @@ class _NoteEditorState extends State<NoteEditor> {
 
     List<Map<String, dynamic>> content = [
       {'type': 'quill', 'value': textController.document.toDelta().toJson()},
-      ...imageData.map((img) => {"type": 'image', "value": base64.encode(img)})
+      ...imageData.map((img) => {"type": 'image', "value": base64.encode(img)}),
     ];
     final appState = context.read<SNoteAppState>();
     await appState.updateContent(widget.note.id, content);
@@ -305,6 +329,25 @@ class _NoteEditorState extends State<NoteEditor> {
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 40,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              updatedAt,
+              style: TextStyle(
+                fontSize: 14, // larger text
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              createdAt,
+              style: TextStyle(
+                fontSize: 12, // smaller text
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_rounded),
           iconSize: 20,
@@ -317,28 +360,31 @@ class _NoteEditorState extends State<NoteEditor> {
         ),
         actions: [
           PopupMenuButton(
-            itemBuilder: (context) => [
-              if (widget.note.status == NoteStatus.normal)
-                PopupMenuItem(
-                  child: const Text('Delete'),
-                  onTap: () async {
-                    await context.read<SNoteAppState>().deleteNote(widget.note);
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                    }
-                  },
-                ),
-              if (widget.note.status == NoteStatus.softDelete)
-                PopupMenuItem(
-                  child: const Text('Restore'),
-                  onTap: () async {
-                    await _saveContent();
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                    }
-                  },
-                ),
-            ],
+            itemBuilder:
+                (context) => [
+                  if (widget.note.status == NoteStatus.normal)
+                    PopupMenuItem(
+                      child: const Text('Delete'),
+                      onTap: () async {
+                        await context.read<SNoteAppState>().deleteNote(
+                          widget.note,
+                        );
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
+                    ),
+                  if (widget.note.status == NoteStatus.softDelete)
+                    PopupMenuItem(
+                      child: const Text('Restore'),
+                      onTap: () async {
+                        await _saveContent();
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
+                    ),
+                ],
           ),
         ],
       ),
@@ -358,18 +404,21 @@ class _NoteEditorState extends State<NoteEditor> {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: imageData.length,
-                itemBuilder: (context, index) => GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ImageViewer(
-                        imageData[index],
-                        _deleteImage,
-                      ),
+                itemBuilder:
+                    (context, index) => GestureDetector(
+                      onTap:
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => ImageViewer(
+                                    imageData[index],
+                                    _deleteImage,
+                                  ),
+                            ),
+                          ),
+                      child: Image.memory(imageData[index]),
                     ),
-                  ),
-                  child: Image.memory(imageData[index]),
-                ),
               ),
             ),
           quill.QuillSimpleToolbar(
@@ -441,9 +490,7 @@ class ImageViewer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Image'),
-      ),
+      appBar: AppBar(title: const Text('Image')),
       body: Center(
         child: Stack(
           children: [
@@ -468,10 +515,7 @@ class ImageViewer extends StatelessWidget {
                     color: Colors.red,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.remove,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.remove, color: Colors.white),
                 ),
               ),
             ),
@@ -485,7 +529,10 @@ class ImageViewer extends StatelessWidget {
 class NoScrollbarScrollBehavior extends ScrollBehavior {
   @override
   Widget buildScrollbar(
-      BuildContext context, Widget child, ScrollableDetails details) {
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
     return child; // Never build a scrollbar
   }
 }
