@@ -266,14 +266,13 @@ class _NoteEditorState extends State<NoteEditor> {
       ...imageData.map((img) => {"type": 'image', "value": base64.encode(img)})
     ];
     final appState = context.read<SNoteAppState>();
-    await appState.updateContent(widget.note.id, content).then((_) {
-      appState.currentScreen = 'SNoteHome';
-      NoteCards.scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    });
+    await appState.updateContent(widget.note.id, content);
+    appState.currentScreen = 'SNoteHome';
+    NoteCards.scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
     _contentChanged = false;
   }
 

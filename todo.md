@@ -41,3 +41,7 @@ feature: export all notes {cm:2025-09-26}
 feature: auto scroll to top after saving note {cm:2025-09-26}
 feature: automatic backgroud saving
 feature: prevent logout when face network issue
+feature: purge all note if refresh token expired
+feature: using local tiny GPT to find similar notes to prevent write duplicate note
+bug: add datetime to note view
+bug: every time open snote not update client update time

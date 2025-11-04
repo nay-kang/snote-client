@@ -128,3 +128,7 @@ at last using Overlay to figure it out.
 2025-04-08
 flutter rich text input has problem with chrome."https://flutter.github.io/samples/web/simplistic_editor/" in this example when put massive text and then select text.the selected area is wrong.this happened on both linux and windows.
 and linux chrome has input method posistion problem.that the input method widget float far away from the focus position when chrome not align left of the screen.
+
+2025-09-27
+about search.for this project the recall is the most important.and the footprint is the second important one dure it need run in web browser. rank,speed and other feature is not important for this project.  
+so the importtant of important is tokenizer for this project.

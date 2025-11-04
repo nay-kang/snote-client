@@ -366,7 +366,7 @@ class MainDrawer extends StatelessWidget {
               }
               logger.d("export button tapped");
               final fileName =
-                  "notes-${DateFormat('yyyy-MM-dd-HH-mm').format(DateTime.now())}";
+                  "notes-${DateFormat('yyyyMMdd-HHmm').format(DateTime.now())}";
               await FileSaver.instance.saveFile(
                   name: fileName,
                   bytes: utf8.encode(exportContent),
