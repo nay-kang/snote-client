@@ -119,11 +119,10 @@ class _NoteThumbState extends State<NoteThumb> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder:
-                  (context) => ChangeNotifierProvider<SNoteAppState>.value(
-                    value: appState,
-                    child: NoteEditor(note: widget.note),
-                  ),
+              builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
+                value: appState,
+                child: NoteEditor(note: widget.note),
+              ),
             ),
           );
         },
@@ -198,7 +197,7 @@ class NoteCards extends StatelessWidget {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async {
-          await appState.fetchNotes(refresh: true);
+          await appState.fetchNotes();
         },
         child: MasonryGridView.builder(
           controller: scrollController,
@@ -259,11 +258,10 @@ class _NoteEditorState extends State<NoteEditor> {
     }
 
     // Initialize text controller
-    var quillContent =
-        widget.note.content.firstWhere(
-          (d) => d['type'] == 'quill',
-          orElse: () => {'value': []},
-        )['value'];
+    var quillContent = widget.note.content.firstWhere(
+      (d) => d['type'] == 'quill',
+      orElse: () => {'value': []},
+    )['value'];
     textController = quill.QuillController.basic();
     textController.document = quill.Document.fromJson(quillContent);
     textController.moveCursorToEnd();
@@ -329,6 +327,7 @@ class _NoteEditorState extends State<NoteEditor> {
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 40,
+        centerTitle: false,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -360,31 +359,28 @@ class _NoteEditorState extends State<NoteEditor> {
         ),
         actions: [
           PopupMenuButton(
-            itemBuilder:
-                (context) => [
-                  if (widget.note.status == NoteStatus.normal)
-                    PopupMenuItem(
-                      child: const Text('Delete'),
-                      onTap: () async {
-                        await context.read<SNoteAppState>().deleteNote(
-                          widget.note,
-                        );
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                        }
-                      },
-                    ),
-                  if (widget.note.status == NoteStatus.softDelete)
-                    PopupMenuItem(
-                      child: const Text('Restore'),
-                      onTap: () async {
-                        await _saveContent();
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                        }
-                      },
-                    ),
-                ],
+            itemBuilder: (context) => [
+              if (widget.note.status == NoteStatus.normal)
+                PopupMenuItem(
+                  child: const Text('Delete'),
+                  onTap: () async {
+                    await context.read<SNoteAppState>().deleteNote(widget.note);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                    }
+                  },
+                ),
+              if (widget.note.status == NoteStatus.softDelete)
+                PopupMenuItem(
+                  child: const Text('Restore'),
+                  onTap: () async {
+                    await _saveContent();
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                    }
+                  },
+                ),
+            ],
           ),
         ],
       ),
@@ -404,21 +400,16 @@ class _NoteEditorState extends State<NoteEditor> {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: imageData.length,
-                itemBuilder:
-                    (context, index) => GestureDetector(
-                      onTap:
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => ImageViewer(
-                                    imageData[index],
-                                    _deleteImage,
-                                  ),
-                            ),
-                          ),
-                      child: Image.memory(imageData[index]),
+                itemBuilder: (context, index) => GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          ImageViewer(imageData[index], _deleteImage),
                     ),
+                  ),
+                  child: Image.memory(imageData[index]),
+                ),
               ),
             ),
           quill.QuillSimpleToolbar(

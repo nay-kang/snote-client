@@ -94,29 +94,39 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
         var outData = {"type": "publicKeyFromB", "key": _pubTempKey};
         noteService!.sendToClient(from, json.encode(outData));
         var publicKey = await EcdhPublicKey.importJsonWebKey(
-            inData['key'] as Map<String, dynamic>, EllipticCurve.p256);
+          inData['key'] as Map<String, dynamic>,
+          EllipticCurve.p256,
+        );
         var privateKey = await EcdhPrivateKey.importJsonWebKey(
-            _privateTempKey!, EllipticCurve.p256);
+          _privateTempKey!,
+          EllipticCurve.p256,
+        );
         _tempEncryptKey = await privateKey.deriveBits(256, publicKey);
         break;
 
       case 'publicKeyFromB':
         var publicKey0 = await EcdhPublicKey.importJsonWebKey(
-            inData['key'] as Map<String, dynamic>, EllipticCurve.p256);
+          inData['key'] as Map<String, dynamic>,
+          EllipticCurve.p256,
+        );
         var privateKey0 = await EcdhPrivateKey.importJsonWebKey(
-            _privateTempKey!, EllipticCurve.p256);
+          _privateTempKey!,
+          EllipticCurve.p256,
+        );
         _tempEncryptKey = await privateKey0.deriveBits(256, publicKey0);
 
         var tempAesKey = await AesGcmSecretKey.importRawKey(_tempEncryptKey!);
 
         var ivBytes = Uint8List(16);
         fillRandomBytes(ivBytes);
-        var encryptedBytes =
-            await tempAesKey.encryptBytes(mainAesKey!, ivBytes);
+        var encryptedBytes = await tempAesKey.encryptBytes(
+          mainAesKey!,
+          ivBytes,
+        );
         var iv = base64.encode(ivBytes);
         var outData = {
           "type": "mainAesKeyFromA",
-          "key": iv + base64.encode(encryptedBytes)
+          "key": iv + base64.encode(encryptedBytes),
         };
         noteService!.sendToClient(from, json.encode(outData));
         _aesKeyExchangeDoneCallback!();
@@ -129,8 +139,10 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
         var encryptedText = keyStr.substring(24);
         var encryptedMainKey = base64.decode(encryptedText);
         var tempAesKey = await AesGcmSecretKey.importRawKey(_tempEncryptKey!);
-        var decryptedBytes =
-            await tempAesKey.decryptBytes(encryptedMainKey, ivBytes);
+        var decryptedBytes = await tempAesKey.decryptBytes(
+          encryptedMainKey,
+          ivBytes,
+        );
         var aesKeyBase64 = base64.encode(decryptedBytes);
         await seStorage.write(key: 'note_aes_key', value: aesKeyBase64);
         _aesKeyExchangeDoneCallback!();
@@ -218,7 +230,9 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
     }
     var lastTimestamp = await db.getLastUpdatedAt();
     var remoteNotes = await noteService!.loadNotesHttp(lastTimestamp);
+    logger.w('in fetchNotes() before updateLocalNotes calling');
     var mergedNotes = await updateLocalNotes(localNotes, remoteNotes);
+    logger.w('in fetchNotes() after updateLocalNotes calling');
     seperatedNotes = trashNoteSeperate(mergedNotes);
     normalNotes.clear();
     normalNotes.addAll(seperatedNotes['normalNotes']!);
@@ -241,21 +255,26 @@ class SNoteAppState extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<List<NoteModel>> updateLocalNotes(
-      List<NoteModel> local, List<NoteModel> remote) async {
+    List<NoteModel> local,
+    List<NoteModel> remote,
+  ) async {
     var db = NoteDB();
     for (var note in remote.reversed) {
+      logger.w('in updateLocalNotes() before db operating');
       if (note.status == NoteStatus.hardDelete) {
         await db.delete(note.id);
       } else {
         await db.save(note);
       }
+      logger.w('in updateLocalNotes() after db operating');
       int index = local.indexWhere((element) => element.id == note.id);
       if (index > -1) {
         local.removeAt(index);
       }
     }
-    remote =
-        remote.where((note) => note.status != NoteStatus.hardDelete).toList();
+    remote = remote
+        .where((note) => note.status != NoteStatus.hardDelete)
+        .toList();
     return remote + local;
   }
 
@@ -395,8 +414,12 @@ class NoteService {
   Function noteUpdatedCallback;
   Completer<StreamController> onLoadingFuture = Completer();
   late Future<HttpClient> clientFuture;
-  NoteService(this.aesKeyCodeCallback, this.aesKeyCodeVerifyCallback,
-      this.messageFromClient, this.noteUpdatedCallback) {
+  NoteService(
+    this.aesKeyCodeCallback,
+    this.aesKeyCodeVerifyCallback,
+    this.messageFromClient,
+    this.noteUpdatedCallback,
+  ) {
     clientFuture = HttpClient.getInstance();
     clientFuture.then((client) {
       onLoadingFuture.complete(client.onLoading);
@@ -423,18 +446,22 @@ class NoteService {
     var host = await getHost();
     var client = await clientFuture;
 
-    var compressBody = GZipEncoder().encode(jsonEncode({
-      'content': encContentStr,
-    }).codeUnits);
-    var response = await client.put(Uri.parse('$host/api/note/$id'),
-        headers: header, body: compressBody);
+    var compressBody = GZipEncoder().encode(
+      jsonEncode({'content': encContentStr}).codeUnits,
+    );
+    var response = await client.put(
+      Uri.parse('$host/api/note/$id'),
+      headers: header,
+      body: compressBody,
+    );
     Map<String, dynamic> data = jsonDecode(response.body);
     var decContent = await _decrypt(data['content']);
     var note = NoteModel(
-        id: data['id'],
-        content: jsonDecode(decContent),
-        createdAt: data['created_at'],
-        updatedAt: data['updated_at']);
+      id: data['id'],
+      content: jsonDecode(decContent),
+      createdAt: data['created_at'],
+      updatedAt: data['updated_at'],
+    );
     return note;
   }
 
@@ -477,19 +504,22 @@ class NoteService {
     }
     var host = await getHost();
     var client = await clientFuture;
-    var response =
-        await client.get(Uri.parse('$host/api/note/$params'), headers: header);
+    var response = await client.get(
+      Uri.parse('$host/api/note/$params'),
+      headers: header,
+    );
     List data = jsonDecode(response.body);
     var notesFutures = data.map((d) async {
       var n = (d as Map<String, dynamic>);
       var ciphertext = n['content'];
       var plaintext = await _decrypt(ciphertext);
       var note = NoteModel(
-          id: n['id'],
-          content: jsonDecode(plaintext),
-          createdAt: n['created_at'],
-          updatedAt: n['updated_at'],
-          status: NoteStatus.getByValue(n['status']));
+        id: n['id'],
+        content: jsonDecode(plaintext),
+        createdAt: n['created_at'],
+        updatedAt: n['updated_at'],
+        status: NoteStatus.getByValue(n['status']),
+      );
       return note;
     }).toList();
     var notes = await Future.wait(notesFutures);
@@ -531,12 +561,10 @@ class NoteService {
           var channel = WebSocketChannel.connect(uri);
 
           rpcClient = jrpc.Peer(channel.cast<String>());
-          rpcClient!.done.then(
-            (value) {
-              logger.w('websocket closed!');
-              rpcClient = null;
-            },
-          );
+          rpcClient!.done.then((value) {
+            logger.w('websocket closed!');
+            rpcClient = null;
+          });
 
           unawaited(rpcClient!.listen());
           var token = await AuthManager.getInstance().accessToken;
@@ -586,8 +614,10 @@ class NoteService {
 
   Future<void> sendToClient(String to, String message) async {
     var client = await getRpcClient();
-    var _ = await client
-        .sendRequest('sendToClient', {'to': to, 'message': message});
+    var _ = await client.sendRequest('sendToClient', {
+      'to': to,
+      'message': message,
+    });
   }
 }
 
@@ -625,19 +655,20 @@ class NoteModel {
     return false;
   }
 
-  NoteModel(
-      {String? id,
-      List<dynamic>? content,
-      String? createdAt,
-      String? updatedAt,
-      this.status = NoteStatus.normal}) {
+  NoteModel({
+    String? id,
+    List<dynamic>? content,
+    String? createdAt,
+    String? updatedAt,
+    this.status = NoteStatus.normal,
+  }) {
     id ??= uuid.v4();
     this.id = id;
     if (content == null) {
       var delta = quill_delta.Delta();
       delta.insert('\n');
       content = [
-        {'type': 'quill', 'value': delta.toJson()}
+        {'type': 'quill', 'value': delta.toJson()},
       ];
     }
     this.content = content;
@@ -679,11 +710,12 @@ class NoteDB {
       var createdAt = DateTime.fromMillisecondsSinceEpoch(row['created_at']);
       var updatedAt = DateTime.fromMillisecondsSinceEpoch(row['updated_at']);
       var note = NoteModel(
-          id: row['id'],
-          content: content,
-          createdAt: createdAt.toString(),
-          updatedAt: updatedAt.toString(),
-          status: NoteStatus.getByValue(row['status']));
+        id: row['id'],
+        content: content,
+        createdAt: createdAt.toString(),
+        updatedAt: updatedAt.toString(),
+        status: NoteStatus.getByValue(row['status']),
+      );
       notes.add(note);
     }
     return notes;
@@ -694,30 +726,39 @@ class NoteDB {
   /// subsequent delete and insert sql will be only executed the last one and after all first insert sql executed.
   final dbExecLock = Lock();
   Future<void> save(NoteModel note) async {
-    await dbExecLock.synchronized(() async {
-      var _db = await getDb();
-      var content = jsonEncode(note.content);
-      var searchContent = extractQuillText(note.content);
-      var createdAt = note.createdAt?.millisecondsSinceEpoch;
-      var updatedAt = note.updatedAt?.millisecondsSinceEpoch;
-      var sql =
-          "insert or replace into note(id,content,created_at,updated_at,status) values(?,?,?,?,?);";
-      await _db.exec(
-          sql, [note.id, content, createdAt, updatedAt, note.status.value]);
-      sql = " delete from note_search where note_id=? ";
-      await _db.exec(sql, [note.id]);
-      logger.d("delete note_search for note ${note.id}");
-      sql = " insert into note_search values(?,?) ";
-      await _db.exec(sql, [note.id, searchContent]);
-    });
+    await dbExecLock
+        .synchronized(() async {
+          var _db = await getDb();
+          var content = jsonEncode(note.content);
+          var searchContent = extractQuillText(note.content);
+          var createdAt = note.createdAt?.millisecondsSinceEpoch;
+          var updatedAt = note.updatedAt?.millisecondsSinceEpoch;
+          var sql =
+              "insert or replace into note(id,content,created_at,updated_at,status) values(?,?,?,?,?);";
+          await _db.exec(sql, [
+            note.id,
+            content,
+            createdAt,
+            updatedAt,
+            note.status.value,
+          ]);
+          sql = " delete from note_search where note_id=? ";
+          await _db.exec(sql, [note.id]);
+          logger.d("delete note_search for note ${note.id}");
+          sql = " insert into note_search values(?,?) ";
+          await _db.exec(sql, [note.id, searchContent]);
+        })
+        .timeout(Duration(seconds: 20));
   }
 
   Future<void> delete(String noteId) async {
-    await dbExecLock.synchronized(() async {
-      var _db = await getDb();
-      await _db.exec('delete from note where id=?', [noteId]);
-      await _db.exec('delete from note_search where note_id=?', [noteId]);
-    });
+    await dbExecLock
+        .synchronized(() async {
+          var _db = await getDb();
+          await _db.exec('delete from note where id=?', [noteId]);
+          await _db.exec('delete from note_search where note_id=?', [noteId]);
+        })
+        .timeout(Duration(seconds: 20));
   }
 
   String extractQuillText(List content) {
@@ -734,18 +775,21 @@ class NoteDB {
   }
 
   Future<void> clear() async {
-    await dbExecLock.synchronized(() async {
-      var _db = await getDb();
-      await _db.exec("drop table note");
-      await _db.exec("drop table note_search");
-      dbInited = false;
-    });
+    await dbExecLock
+        .synchronized(() async {
+          var _db = await getDb();
+          await _db.exec("drop table note");
+          await _db.exec("drop table note_search");
+          dbInited = false;
+        })
+        .timeout(Duration(seconds: 20));
   }
 
   Future<DateTime> getLastUpdatedAt() async {
     var _db = await getDb();
-    var rows = await _db
-        .query("select updated_at from note order by updated_at desc limit 1");
+    var rows = await _db.query(
+      "select updated_at from note order by updated_at desc limit 1",
+    );
     if (rows.isNotEmpty) {
       var ts = rows[0]['updated_at'];
       return DateTime.fromMillisecondsSinceEpoch(ts);
@@ -757,8 +801,9 @@ class NoteDB {
   Future<List<String>> search(String query) async {
     var _db = await getDb();
     var rows = await _db.query(
-        "select note_id from note_search where content match simple_query(?)",
-        [query]);
+      "select note_id from note_search where content match simple_query(?)",
+      [query],
+    );
     List<String> ids = [];
     for (var row in rows) {
       ids.add(row['note_id']);

@@ -42,7 +42,35 @@ Future<void> main() async {
     return true;
   };
 
-  runApp(const SNoteApp());
+  runApp(RestartWidget(child: const SNoteApp()));
+}
+
+class RestartWidget extends StatefulWidget {
+  final Widget child;
+
+  const RestartWidget({super.key, required this.child});
+
+  static void restartApp(BuildContext context) {
+    context.findAncestorStateOfType<_RestartWidgetState>()?.restartApp();
+  }
+
+  @override
+  State<RestartWidget> createState() => _RestartWidgetState();
+}
+
+class _RestartWidgetState extends State<RestartWidget> {
+  Key key = UniqueKey();
+
+  void restartApp() {
+    setState(() {
+      key = UniqueKey(); // forces rebuild of the whole subtree
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyedSubtree(key: key, child: widget.child);
+  }
 }
 
 void showErrorMessage(String error) {
@@ -101,7 +129,9 @@ class GlobalLoadingIndicatorWidget {
       return;
     }
 
-    _overlayEntry.remove();
+    if (_overlayEntry.mounted) {
+      _overlayEntry.remove();
+    }
   }
 }
 
@@ -113,16 +143,16 @@ class SNoteApp extends StatelessWidget {
     return MaterialApp(
       scaffoldMessengerKey: scaffoldMessengerKey,
       theme: ThemeData(
-          useMaterial3: false,
-          brightness: Brightness.light,
-          fontFamily: 'NotoSansSC-local'),
-      darkTheme: ThemeData(
-          brightness: Brightness.dark,
-          useMaterial3: false,
-          fontFamily: 'NotoSansSC-local'),
-      home: Builder(
-        builder: (context) => AuthGate(),
+        useMaterial3: false,
+        brightness: Brightness.light,
+        fontFamily: 'NotoSansSC-local',
       ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        useMaterial3: false,
+        fontFamily: 'NotoSansSC-local',
+      ),
+      home: Builder(builder: (context) => AuthGate()),
       localizationsDelegates: [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -139,51 +169,48 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<AuthState>(
-        stream: AuthManager.getInstance().authStateChanges,
-        builder: (context, authState) {
-          if (authState.hasError) {
-            showErrorMessage(authState.error.toString());
-            return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
-
-          if (authState.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
-
-          final state = authState.data!;
-          if (!state.isAuthenticated) {
-            return const PasswordLessLogin(); // PasswordLessLogin is now wrapped in root MaterialApp
-          }
-
-          appState.onLoadingFuture.future.then((streamController) {
-            if (streamController.hasListener) {
-              return;
-            }
-            streamController.stream.listen((event) {
-              if (event) {
-                if (context.mounted) {
-                  GlobalLoadingIndicatorWidget().show(context);
-                }
-              } else {
-                GlobalLoadingIndicatorWidget().hide();
-              }
-            });
-          });
-          return ChangeNotifierProvider.value(
-            value: appState,
-            builder: ((context, child) {
-              return const SNoteMain();
-            }),
+      stream: AuthManager.getInstance().authStateChanges,
+      builder: (context, authState) {
+        if (authState.hasError) {
+          showErrorMessage(authState.error.toString());
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
           );
+        }
+
+        if (authState.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final state = authState.data!;
+        if (!state.isAuthenticated) {
+          return const PasswordLessLogin(); // PasswordLessLogin is now wrapped in root MaterialApp
+        }
+
+        appState.onLoadingFuture.future.then((streamController) {
+          if (streamController.hasListener) {
+            return;
+          }
+          streamController.stream.listen((event) {
+            if (event) {
+              if (context.mounted) {
+                GlobalLoadingIndicatorWidget().show(context);
+              }
+            } else {
+              GlobalLoadingIndicatorWidget().hide();
+            }
+          });
         });
+        return ChangeNotifierProvider.value(
+          value: appState,
+          builder: ((context, child) {
+            return const SNoteMain();
+          }),
+        );
+      },
+    );
   }
 }
 
@@ -268,13 +295,14 @@ class SNoteHome extends StatelessWidget {
         onPressed: () {
           var note = appState.createNote();
           Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) =>
-                      ChangeNotifierProvider<SNoteAppState>.value(
-                        value: appState,
-                        child: NoteEditor(note: note),
-                      )));
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChangeNotifierProvider<SNoteAppState>.value(
+                value: appState,
+                child: NoteEditor(note: note),
+              ),
+            ),
+          );
         },
         tooltip: 'Create',
         child: const Icon(Icons.add),
@@ -302,13 +330,11 @@ class SNoteTrash extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              child:
-                  const Text('Notes in trash will auto delete after 30 days'),
+              child: const Text(
+                'Notes in trash will auto delete after 30 days',
+              ),
             ),
-            const Expanded(
-                child: NoteCards(
-              listType: NoteListType.trash,
-            )),
+            const Expanded(child: NoteCards(listType: NoteListType.trash)),
           ],
         ),
       ),
@@ -325,87 +351,121 @@ class MainDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     var appState = context.watch<SNoteAppState>();
     return Drawer(
-        child: ListView(
-      children: [
-        DrawerHeader(child: Text(appState.displayName)),
-        ListTile(
-          leading: const Icon(Icons.home),
-          title: const Text('Home'),
-          onTap: () {
-            appState.currentScreen = 'SNoteHome';
-            Navigator.of(context).pushReplacement(MaterialPageRoute(
-                builder: (context) =>
-                    ChangeNotifierProvider<SNoteAppState>.value(
-                      value: appState,
-                      builder: (context, child) => const SNoteHome(),
-                    )));
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.devices),
-          title: const Text('devices'),
-          onTap: () {
-            logger.d('devices button tapped');
-            throw Exception();
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.archive),
-          title: const Text('Export'),
-          onTap: () async {
-            GlobalLoadingIndicatorWidget().show(context);
-            try {
-              String exportContent = "";
-              for (var note in appState.normalNotes) {
-                exportContent += "${jsonEncode({
-                      "id": note.id,
-                      "content": note.content,
-                      "update_at":
-                          DateFormat('yyyy-MM-dd HH:mm').format(note.updatedAt!)
-                    })}\n";
-              }
-              logger.d("export button tapped");
-              final fileName =
-                  "notes-${DateFormat('yyyyMMdd-HHmm').format(DateTime.now())}";
-              await FileSaver.instance.saveFile(
+      child: ListView(
+        children: [
+          DrawerHeader(child: Text(appState.displayName)),
+          ListTile(
+            leading: const Icon(Icons.home),
+            title: const Text('Home'),
+            onTap: () {
+              appState.currentScreen = 'SNoteHome';
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      ChangeNotifierProvider<SNoteAppState>.value(
+                        value: appState,
+                        builder: (context, child) => const SNoteHome(),
+                      ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.devices),
+            title: const Text('devices'),
+            onTap: () {
+              logger.d('devices button tapped');
+              throw Exception();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.archive),
+            title: const Text('Export'),
+            onTap: () async {
+              GlobalLoadingIndicatorWidget().show(context);
+              try {
+                String exportContent = "";
+                for (var note in appState.normalNotes) {
+                  exportContent +=
+                      "${jsonEncode({"id": note.id, "content": note.content, "update_at": DateFormat('yyyy-MM-dd HH:mm').format(note.updatedAt!)})}\n";
+                }
+                logger.d("export button tapped");
+                final fileName =
+                    "notes-${DateFormat('yyyyMMdd-HHmm').format(DateTime.now())}";
+                await FileSaver.instance.saveFile(
                   name: fileName,
                   bytes: utf8.encode(exportContent),
                   fileExtension: "jl",
-                  mimeType: MimeType.text);
-              scaffoldMessengerKey.currentState?.showSnackBar(const SnackBar(
-                content: Text("Notes exported successfully"),
-                duration: Duration(seconds: 2),
-              ));
-            } catch (e) {
-              showErrorMessage("Export failed: $e");
-            } finally {
-              GlobalLoadingIndicatorWidget().hide();
-            }
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.delete),
-          title: const Text('Trash'),
-          onTap: () {
-            appState.currentScreen = 'SNoteTrash';
-            Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) =>
-                    ChangeNotifierProvider<SNoteAppState>.value(
-                      value: appState,
-                      builder: (context, child) => const SNoteTrash(),
-                    )));
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.logout),
-          title: const Text('Sign Out'),
-          onTap: () {
-            appState.remoteAesKey();
-            AuthManager.getInstance().logout();
-          },
-        )
-      ],
-    ));
+                  mimeType: MimeType.text,
+                );
+                scaffoldMessengerKey.currentState?.showSnackBar(
+                  const SnackBar(
+                    content: Text("Notes exported successfully"),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              } catch (e) {
+                showErrorMessage("Export failed: $e");
+              } finally {
+                GlobalLoadingIndicatorWidget().hide();
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete),
+            title: const Text('Trash'),
+            onTap: () {
+              appState.currentScreen = 'SNoteTrash';
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      ChangeNotifierProvider<SNoteAppState>.value(
+                        value: appState,
+                        builder: (context, child) => const SNoteTrash(),
+                      ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Sign Out'),
+            onTap: () {
+              appState.remoteAesKey();
+              AuthManager.getInstance().logout();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.refresh),
+            title: const Text('Refresh'),
+            onTap: () {
+              scaffoldMessengerKey.currentState?.showSnackBar(
+                SnackBar(
+                  content: Text("Refreshing..."),
+                  duration: const Duration(milliseconds: 30000),
+                  margin: const EdgeInsets.fromLTRB(15, 0, 15, 0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 4.0,
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                ),
+              );
+              appState.fetchNotes(refresh: true).then((value) {
+                if (context.mounted) {
+                  print("refresh app");
+                  RestartWidget.restartApp(context);
+                  scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
+                }
+              });
+            },
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -429,10 +489,11 @@ class _BottomAppBar extends StatelessWidget {
               },
             ),
             IconButton(
-                onPressed: () {
-                  showSearch(context: context, delegate: NoteSearch(appState));
-                },
-                icon: const Icon(Icons.search))
+              onPressed: () {
+                showSearch(context: context, delegate: NoteSearch(appState));
+              },
+              icon: const Icon(Icons.search),
+            ),
           ],
         ),
       ),
@@ -474,7 +535,9 @@ class _KeyExchangePopState extends State<KeyExchangePop> {
       width: 56,
       height: 56,
       textStyle: TextStyle(
-          fontSize: 22, color: Theme.of(context).colorScheme.onSurface),
+        fontSize: 22,
+        color: Theme.of(context).colorScheme.onSurface,
+      ),
       decoration: BoxDecoration(),
     );
     final cursor = Column(
@@ -505,36 +568,42 @@ class _KeyExchangePopState extends State<KeyExchangePop> {
     );
 
     return Center(
-        child: Column(children: [
-      Text('Enter Code', style: Theme.of(context).textTheme.titleLarge),
-      Pinput(
-        length: 4,
-        pinAnimationType: PinAnimationType.slide,
-        controller: textController,
-        defaultPinTheme: defaultPinTheme,
-        cursor: cursor,
-        showCursor: true,
-        preFilledWidget: preFilledWidget,
-        autofocus: true,
-        onCompleted: (value) {
-          appState.verifyAesExchangeCode(value);
-        },
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-        child: Text('Please open your other client to generate code',
-            style: Theme.of(context).textTheme.bodyMedium),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-        child: ElevatedButton.icon(
-            onPressed: () {
-              appState.prepareKeyExchange();
+      child: Column(
+        children: [
+          Text('Enter Code', style: Theme.of(context).textTheme.titleLarge),
+          Pinput(
+            length: 4,
+            pinAnimationType: PinAnimationType.slide,
+            controller: textController,
+            defaultPinTheme: defaultPinTheme,
+            cursor: cursor,
+            showCursor: true,
+            preFilledWidget: preFilledWidget,
+            autofocus: true,
+            onCompleted: (value) {
+              appState.verifyAesExchangeCode(value);
             },
-            icon: const Icon(Icons.refresh),
-            label: const Text('Try Again')),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+            child: Text(
+              'Please open your other client to generate code',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                appState.prepareKeyExchange();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+            ),
+          ),
+        ],
       ),
-    ]));
+    );
   }
 }
 
@@ -554,26 +623,28 @@ class KeyExchangeCodePop extends StatelessWidget {
     appState.setAesExchangeCode(code);
 
     return Center(
-        child: Column(children: [
-      Text('Key Exchange Code', style: Theme.of(context).textTheme.titleLarge),
-      const SizedBox(
-        height: 30,
+      child: Column(
+        children: [
+          Text(
+            'Key Exchange Code',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 30),
+          Text(
+            code,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
+              fontSize: 30,
+            ),
+          ),
+          const SizedBox(height: 30),
+          Text(
+            'One of your client are requiring the important encryption key\nWhen this code typed means authorize that client to decode your notes',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
       ),
-      Text(
-        code,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.primary,
-          fontSize: 30,
-        ),
-      ),
-      const SizedBox(
-        height: 30,
-      ),
-      Text(
-        'One of your client are requiring the important encryption key\nWhen this code typed means authorize that client to decode your notes',
-        style: Theme.of(context).textTheme.bodyMedium,
-      )
-    ]));
+    );
   }
 }
 
@@ -614,42 +685,48 @@ class NoteSearch extends SearchDelegate {
 
   FutureBuilder showFutureResult(Future<dynamic>? result) {
     return FutureBuilder(
-        future: result,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done &&
-              snapshot.hasData) {
-            return ChangeNotifierProvider<SNoteAppState>.value(
-                value: appState, child: NoteCards(searchResult: snapshot.data));
-            // below method will cause SnoteAppState dispose, I don't know why
-            // return ChangeNotifierProvider(create: (context) => appState,
-            //   builder: (context, child) =>
-            //       NoteCards(searchResult: snapshot.data),
-            // );
-          } else {
-            /* 
+      future: result,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done &&
+            snapshot.hasData) {
+          return ChangeNotifierProvider<SNoteAppState>.value(
+            value: appState,
+            child: NoteCards(searchResult: snapshot.data),
+          );
+          // below method will cause SnoteAppState dispose, I don't know why
+          // return ChangeNotifierProvider(create: (context) => appState,
+          //   builder: (context, child) =>
+          //       NoteCards(searchResult: snapshot.data),
+          // );
+        } else {
+          /* 
             I want keep showing previous result while user typing, but at here it will fire every time user typed a single letter
             I know it will not re-render if the app state not changed.but I am not sure if there has other costs.
             so I keep showing blank while user typing.
             */
-            return const SizedBox.shrink();
-          }
-        });
+          return const SizedBox.shrink();
+        }
+      },
+    );
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
     Completer completer = Completer();
 
-    EasyDebounce.debounce(debouncerId, const Duration(milliseconds: 500),
-        () async {
-      if (query.isEmpty) {
-        completer.complete(<NoteModel>[]);
-        return;
-      }
-      var result = await appState.searchNotes(query);
-      completer.complete(result);
-      // showResults(context);
-    });
+    EasyDebounce.debounce(
+      debouncerId,
+      const Duration(milliseconds: 500),
+      () async {
+        if (query.isEmpty) {
+          completer.complete(<NoteModel>[]);
+          return;
+        }
+        var result = await appState.searchNotes(query);
+        completer.complete(result);
+        // showResults(context);
+      },
+    );
     return showFutureResult(completer.future);
   }
 }
