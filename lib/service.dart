@@ -537,6 +537,10 @@ class NoteService {
   }
 
   Future<String> _decrypt(String content) async {
+    // hard delete note has empty content
+    if (content.trim().isEmpty) {
+      return '';
+    }
     var iv = content.substring(0, 24);
     var ivBytes = base64.decode(iv);
     var encryptor = await getEncryptor();
